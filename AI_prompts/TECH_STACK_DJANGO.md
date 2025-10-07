@@ -181,7 +181,7 @@
 ### Code Quality:
 - **Linter**: `ruff` - najszybszy linter Python
 - **Formatter**: `ruff format` (zamiennik Black)
-- **Type Checking**: `mypy`
+- **Type Checking**: `ty`
 - **Import sorting**: `ruff` (built-in)
 
 ### Testing:

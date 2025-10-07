@@ -1,0 +1,60 @@
+---
+alwaysApply: true
+---
+# AI Rules for MyVOD
+
+MyVOD is a web application that helps movie enthusiasts manage their watchlists and discover the availability of those movies on popular VOD platforms. The application solves the problem of time-consuming searching across multiple streaming platforms, allowing users to quickly check which movies from their watchlist are currently available on their subscriptions.
+
+## Tech Stack
+
+### Backend
+- Python 3.11+
+- Django 5.0+ & Django REST Framework
+- Celery 5.3+ & Redis 7+
+- PostgreSQL 15
+
+### Frontend
+- React 18 & Vite 5+
+- Tailwind CSS & shadcn/ui
+- TanStack Query (React Query)
+- React Router v6
+- Axios 1.6+
+
+## Project Structure
+
+When introducing changes to the project, always follow the directory structure below:
+
+- `./backend` - Backend application based on Django REST Framework
+- `./backend/myVOD` - Django project configuration (settings, root URLs)
+- `./backend/apps` - Core application modules (users, movies, watchlist, etc.)
+- `./backend/services` - Clients for external APIs (TMDB, Gemini, etc.)
+- `./backend/tasks` - Asynchronous Celery tasks
+- `./frontend` - Frontend application in React (Vite + TypeScript)
+- `./frontend/src` - Main frontend source code
+- `./frontend/src/pages` - Page components for specific views/routes
+- `./frontend/src/components` - Reusable application components
+- `./frontend/src/hooks` - Custom React hooks for managing logic
+- `./frontend/src/lib` - API client (Axios) and other utility functions
+- `./nginx` - Nginx configuration for the production environment
+- `./.github/workflows` - CI/CD configuration files for GitHub Actions
+
+When modifying the directory structure, always update this section.
+
+## Coding Guidelines
+
+- **Error Handling First:** Prioritize robust error handling. Use guard clauses and early returns at the beginning of functions to handle errors and edge cases. This avoids deep nesting and keeps the "happy path" at the end.
+- **Readability:** Write clean, readable code. Avoid unnecessary `else` statements by using the `if-return` pattern.
+- **Logging:** Implement proper error logging with user-friendly messages.
+- **Consistency:** For consistent error handling, consider using custom error types or factories.
+
+## Testing
+
+- Write unit tests for business logic in services and Django apps (`./backend/apps`).
+- Write integration tests for API endpoints to ensure they behave as expected.
+- On the frontend, write component tests to verify UI behavior.
+
+## API Design
+
+- Follow RESTful principles for all endpoints.
+- Use clear and consistent naming for URLs, serializers, and views.
+- Standardize the structure of API responses, especially for errors.
