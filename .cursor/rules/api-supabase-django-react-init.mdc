@@ -1,0 +1,311 @@
+---
+alwaysApply: false
+---
+
+# Instrukcja: Integracja Supabase z Django i React
+
+Ta instrukcja prowadzi Cię krok po kroku przez proces konfiguracji Supabase w projekcie wykorzystującym Django dla backendu i React (z Vite) dla frontendu. Twoim zadaniem jest wykonanie poniższych kroków, weryfikując po drodze wymagania wstępne.
+
+## Część 1: Konfiguracja Frontendu (React + Vite)
+
+**Cel**: Skonfigurowanie klienta Supabase w aplikacji React, aby umożliwić komunikację z API Supabase.
+
+### Krok 1.1: Weryfikacja wymagań wstępnych
+
+Przed przystąpieniem do działania, sprawdź następujące warunki:
+1.  **Czy istnieje katalog `frontend`?** Jeśli nie, poinformuj użytkownika, że główny katalog frontendu nie został znaleziony i zapytaj, czy ma zostać utworzony, czy też znajduje się w innej lokalizacji.
+2.  **Czy w pliku `frontend/package.json` znajduje się zależność `@supabase/supabase-js`?** Jeśli nie, zapytaj użytkownika, czy chcesz dodać ją do projektu, wykonując komendę `npm install @supabase/supabase-js -w frontend`.
+
+Po potwierdzeniu, że wymagania są spełnione, przejdź do następnego kroku.
+
+### Krok 1.2: Utworzenie pliku `.env` ze zmiennymi środowiskowymi
+
+**Cel**: Bezpieczne przechowywanie kluczy dostępowych do Supabase.
+
+1.  **Sprawdź, czy plik `frontend/.env` istnieje.**
+2.  Jeśli plik nie istnieje, utwórz go.
+3.  Dodaj do pliku `frontend/.env` następującą zawartość, informując użytkownika o konieczności zastąpienia placeholderów (`YOUR_...`) prawdziwymi danymi z panelu Supabase.
+
+    ```env
+    # Zmienne środowiskowe dla klienta Supabase
+    # Zastąp wartości swoimi danymi z panelu Supabase
+    VITE_SUPABASE_URL="YOUR_SUPABASE_URL"
+    VITE_SUPABASE_ANON_KEY="YOUR_SUPABASE_ANON_KEY"
+    ```
+
+**Wyjaśnienie**: Plik `.env` służy do przechowywania wrażliwych danych, takich jak klucze API. Dzięki temu nie są one zapisywane bezpośrednio w kodzie i nie trafiają do publicznego repozytorium. Prefiks `VITE_` jest wymagany przez narzędzie Vite, aby zmienne te były dostępne w kodzie klienta (przeglądarki).
+
+### Krok 1.3: Inicjalizacja klienta Supabase
+
+**Cel**: Stworzenie centralnego punktu w aplikacji do komunikacji z Supabase.
+
+1.  **Sprawdź, czy istnieje katalog `frontend/src/lib`.** Jeśli nie, zapytaj użytkownika, czy chcesz go utworzyć.
+2.  Utwórz nowy plik `frontend/src/lib/supabase.ts` z poniższą zawartością:
+
+    ```ts
+    import { createClient } from '@supabase/supabase-js';
+    import type { Database } from '../types/database.types';
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Supabase URL and Anon Key must be defined in the environment variables.");
+    }
+
+    export const supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey);
+    ```
+
+**Wyjaśnienie**: Ten plik tworzy i eksportuje jedną instancję klienta Supabase. Dzięki temu w całej aplikacji możemy importować `supabaseClient` i używać go do interakcji z API Supabase (np. do logowania użytkowników, pobierania danych). Sprawdzenie `if (!supabaseUrl ...)` zabezpiecza przed uruchomieniem aplikacji bez zdefiniowanych kluczy.
+
+### Krok 1.4: Definicja typów dla zmiennych środowiskowych
+
+**Cel**: Poinformowanie TypeScriptu o istnieniu i typach naszych zmiennych środowiskowych.
+
+1.  **Sprawdź, czy plik `frontend/src/vite-env.d.ts` istnieje.** Zazwyczaj jest on tworzony automatycznie przez Vite. Jeśli nie, utwórz go.
+2.  Dodaj lub zmodyfikuj plik, aby zawierał poniższy kod:
+
+    ```ts
+    /// <reference types="vite/client" />
+
+    interface ImportMetaEnv {
+      readonly VITE_SUPABASE_URL: string;
+      readonly VITE_SUPABASE_ANON_KEY: string;
+    }
+
+    interface ImportMeta {
+      readonly env: ImportMetaEnv;
+    }
+    ```
+
+**Wyjaśnienie**: Ten plik rozszerza globalne typy TypeScriptu. Dzięki temu, gdy odwołamy się do `import.meta.env.VITE_SUPABASE_URL`, TypeScript będzie wiedział, że taka zmienna istnieje i jest typu `string`, co zapewnia bezpieczeństwo typów i autouzupełnianie kodu.
+
+### Krok 1.5: Generowanie typów dla bazy danych
+
+**Cel**: Uzyskanie pełnego bezpieczeństwa typów dla całej struktury bazy danych.
+
+1.  Poinformuj użytkownika, że ten krok wymaga zainstalowanego **Supabase CLI** i zalogowania się (`npx supabase login`) oraz połączenia z projektem (`npx supabase link --project-ref <your-project-ref>`).
+2.  **Sprawdź, czy istnieje katalog `frontend/src/types`.** Jeśli nie, zapytaj użytkownika, czy chcesz go utworzyć.
+3.  Zaproponuj wykonanie następującej komendy w terminalu, aby wygenerować typy:
+
+    ```bash
+    npx supabase gen types typescript --linked > frontend/src/types/database.types.ts
+    ```
+
+**Wyjaśnienie**: Ta komenda łączy się z Twoim projektem Supabase, analizuje schemat bazy danych (tabele, kolumny, relacje) i generuje plik `database.types.ts`. Dzięki temu plikowi, podczas pisania zapytań w kodzie (np. `supabaseClient.from('users').select()`), TypeScript będzie znał wszystkie dostępne tabele i kolumny, co eliminuje literówki i błędy.
+
+---
+
+## Część 2: Konfiguracja Backendu (Django)
+
+**Cel**: Połączenie Django z bazą danych PostgreSQL hostowaną na Supabase.
+
+### Krok 2.1: Weryfikacja wymagań wstępnych
+
+1.  **Czy istnieje katalog `/backend`?** Jeśli nie, poinformuj użytkownika, że katalog backendu nie został znaleziony.
+2.  **Czy w pliku `backend/pyproject.toml` (lub `requirements.txt`) znajduje się zależność `psycopg2-binary`?** Jest to sterownik potrzebny Django do komunikacji z PostgreSQL. Jeśli go brakuje, zapytaj, czy go dodać i zainstalować.
+
+### Krok 2.2: Konfiguracja zmiennych środowiskowych dla bazy danych
+
+**Cel**: Bezpieczne przechowywanie danych dostępowych do bazy danych PostgreSQL.
+
+1.  **Sprawdź, czy plik `backend/.env` istnieje.** Jeśli nie, utwórz go.
+2.  Dodaj do pliku `backend/.env` następującą zawartość. Poinformuj użytkownika, że dane te (host, port, hasło) można znaleźć w panelu Supabase w zakładce `Settings > Database`.
+
+    ```env
+    # Dane do połączenia z bazą danych Supabase (PostgreSQL)
+    SUPABASE_DB_HOST="YOUR_DB_HOST"
+    SUPABASE_DB_PORT="YOUR_DB_PORT"
+    SUPABASE_DB_PASSWORD="YOUR_DB_PASSWORD"
+    ```
+
+**Wyjaśnienie**: Backend Django łączy się bezpośrednio z bazą danych PostgreSQL, a nie przez API Supabase. Dlatego potrzebujemy standardowych danych połączeniowych, które, podobnie jak klucze frontendowe, przechowujemy w pliku `.env` dla bezpieczeństwa.
+
+### Krok 2.3: Aktualizacja ustawień Django
+
+**Cel**: Skonfigurowanie Django, aby używało bazy danych Supabase.
+
+1.  **Odszukaj plik `settings.py` w projekcie Django.** Prawdopodobna lokalizacja to `backend/myVOD/settings.py`.
+2.  Zmodyfikuj ten plik, aby załadować zmienne środowiskowe i skonfigurować połączenie z bazą danych. Upewnij się, że na początku pliku importujesz `os` i `dotenv`.
+
+    ```python
+    # backend/myVOD/settings.py
+
+    import os
+    from dotenv import load_dotenv
+
+    # ... inne importy
+
+    # Na początku pliku, po importach
+    load_dotenv()
+
+    # ...
+
+    # Znajdź i zastąp sekcję DATABASES
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'postgres',
+            'USER': 'postgres',
+            'PASSWORD': os.getenv('SUPABASE_DB_PASSWORD'),
+            'HOST': os.getenv('SUPABASE_DB_HOST'),
+            'PORT': os.getenv('SUPABASE_DB_PORT'),
+        }
+    }
+    ```
+
+**Wyjaśnienie**: Ten kod instruuje Django, aby używało sterownika `postgresql` i pobierało dane dostępowe (host, port, hasło) ze zmiennych środowiskowych, które wcześniej zdefiniowaliśmy. `NAME` i `USER` są domyślnie ustawione na `postgres` w Supabase. Dzięki temu aplikacja Django będzie mogła wykonywać operacje na bazie danych hostowanej w chmurze Supabase.rule type: manual
+
+# Instrukcja: Integracja Supabase z Django i React
+
+Ta instrukcja prowadzi Cię krok po kroku przez proces konfiguracji Supabase w projekcie wykorzystującym Django dla backendu i React (z Vite) dla frontendu. Twoim zadaniem jest wykonanie poniższych kroków, weryfikując po drodze wymagania wstępne.
+
+## Część 1: Konfiguracja Frontendu (React + Vite)
+
+**Cel**: Skonfigurowanie klienta Supabase w aplikacji React, aby umożliwić komunikację z API Supabase.
+
+### Krok 1.1: Weryfikacja wymagań wstępnych
+
+Przed przystąpieniem do działania, sprawdź następujące warunki:
+1.  **Czy istnieje katalog `frontend`?** Jeśli nie, poinformuj użytkownika, że główny katalog frontendu nie został znaleziony i zapytaj, czy ma zostać utworzony, czy też znajduje się w innej lokalizacji.
+2.  **Czy w pliku `frontend/package.json` znajduje się zależność `@supabase/supabase-js`?** Jeśli nie, zapytaj użytkownika, czy chcesz dodać ją do projektu, wykonując komendę `npm install @supabase/supabase-js -w frontend`.
+
+Po potwierdzeniu, że wymagania są spełnione, przejdź do następnego kroku.
+
+### Krok 1.2: Utworzenie pliku `.env` ze zmiennymi środowiskowymi
+
+**Cel**: Bezpieczne przechowywanie kluczy dostępowych do Supabase.
+
+1.  **Sprawdź, czy plik `frontend/.env` istnieje.**
+2.  Jeśli plik nie istnieje, utwórz go.
+3.  Dodaj do pliku `frontend/.env` następującą zawartość, informując użytkownika o konieczności zastąpienia placeholderów (`YOUR_...`) prawdziwymi danymi z panelu Supabase.
+
+    ```env
+    # Zmienne środowiskowe dla klienta Supabase
+    # Zastąp wartości swoimi danymi z panelu Supabase
+    VITE_SUPABASE_URL="YOUR_SUPABASE_URL"
+    VITE_SUPABASE_ANON_KEY="YOUR_SUPABASE_ANON_KEY"
+    ```
+
+**Wyjaśnienie**: Plik `.env` służy do przechowywania wrażliwych danych, takich jak klucze API. Dzięki temu nie są one zapisywane bezpośrednio w kodzie i nie trafiają do publicznego repozytorium. Prefiks `VITE_` jest wymagany przez narzędzie Vite, aby zmienne te były dostępne w kodzie klienta (przeglądarki).
+
+### Krok 1.3: Inicjalizacja klienta Supabase
+
+**Cel**: Stworzenie centralnego punktu w aplikacji do komunikacji z Supabase.
+
+1.  **Sprawdź, czy istnieje katalog `frontend/src/lib`.** Jeśli nie, zapytaj użytkownika, czy chcesz go utworzyć.
+2.  Utwórz nowy plik `frontend/src/lib/supabase.ts` z poniższą zawartością:
+
+    ```ts
+    import { createClient } from '@supabase/supabase-js';
+    import type { Database } from '../types/database.types';
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Supabase URL and Anon Key must be defined in the environment variables.");
+    }
+
+    export const supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey);
+    ```
+
+**Wyjaśnienie**: Ten plik tworzy i eksportuje jedną instancję klienta Supabase. Dzięki temu w całej aplikacji możemy importować `supabaseClient` i używać go do interakcji z API Supabase (np. do logowania użytkowników, pobierania danych). Sprawdzenie `if (!supabaseUrl ...)` zabezpiecza przed uruchomieniem aplikacji bez zdefiniowanych kluczy.
+
+### Krok 1.4: Definicja typów dla zmiennych środowiskowych
+
+**Cel**: Poinformowanie TypeScriptu o istnieniu i typach naszych zmiennych środowiskowych.
+
+1.  **Sprawdź, czy plik `frontend/src/vite-env.d.ts` istnieje.** Zazwyczaj jest on tworzony automatycznie przez Vite. Jeśli nie, utwórz go.
+2.  Dodaj lub zmodyfikuj plik, aby zawierał poniższy kod:
+
+    ```ts
+    /// <reference types="vite/client" />
+
+    interface ImportMetaEnv {
+      readonly VITE_SUPABASE_URL: string;
+      readonly VITE_SUPABASE_ANON_KEY: string;
+    }
+
+    interface ImportMeta {
+      readonly env: ImportMetaEnv;
+    }
+    ```
+
+**Wyjaśnienie**: Ten plik rozszerza globalne typy TypeScriptu. Dzięki temu, gdy odwołamy się do `import.meta.env.VITE_SUPABASE_URL`, TypeScript będzie wiedział, że taka zmienna istnieje i jest typu `string`, co zapewnia bezpieczeństwo typów i autouzupełnianie kodu.
+
+### Krok 1.5: Generowanie typów dla bazy danych
+
+**Cel**: Uzyskanie pełnego bezpieczeństwa typów dla całej struktury bazy danych.
+
+1.  Poinformuj użytkownika, że ten krok wymaga zainstalowanego **Supabase CLI** i zalogowania się (`npx supabase login`) oraz połączenia z projektem (`npx supabase link --project-ref <your-project-ref>`).
+2.  **Sprawdź, czy istnieje katalog `frontend/src/types`.** Jeśli nie, zapytaj użytkownika, czy chcesz go utworzyć.
+3.  Zaproponuj wykonanie następującej komendy w terminalu, aby wygenerować typy:
+
+    ```bash
+    npx supabase gen types typescript --linked > frontend/src/types/database.types.ts
+    ```
+
+**Wyjaśnienie**: Ta komenda łączy się z Twoim projektem Supabase, analizuje schemat bazy danych (tabele, kolumny, relacje) i generuje plik `database.types.ts`. Dzięki temu plikowi, podczas pisania zapytań w kodzie (np. `supabaseClient.from('users').select()`), TypeScript będzie znał wszystkie dostępne tabele i kolumny, co eliminuje literówki i błędy.
+
+---
+
+## Część 2: Konfiguracja Backendu (Django)
+
+**Cel**: Połączenie Django z bazą danych PostgreSQL hostowaną na Supabase.
+
+### Krok 2.1: Weryfikacja wymagań wstępnych
+
+1.  **Czy istnieje katalog `/backend`?** Jeśli nie, poinformuj użytkownika, że katalog backendu nie został znaleziony.
+2.  **Czy w pliku `backend/pyproject.toml` (lub `requirements.txt`) znajduje się zależność `psycopg2-binary`?** Jest to sterownik potrzebny Django do komunikacji z PostgreSQL. Jeśli go brakuje, zapytaj, czy go dodać i zainstalować.
+
+### Krok 2.2: Konfiguracja zmiennych środowiskowych dla bazy danych
+
+**Cel**: Bezpieczne przechowywanie danych dostępowych do bazy danych PostgreSQL.
+
+1.  **Sprawdź, czy plik `backend/.env` istnieje.** Jeśli nie, utwórz go.
+2.  Dodaj do pliku `backend/.env` następującą zawartość. Poinformuj użytkownika, że dane te (host, port, hasło) można znaleźć w panelu Supabase w zakładce `Settings > Database`.
+
+    ```env
+    # Dane do połączenia z bazą danych Supabase (PostgreSQL)
+    SUPABASE_DB_HOST="YOUR_DB_HOST"
+    SUPABASE_DB_PORT="YOUR_DB_PORT"
+    SUPABASE_DB_PASSWORD="YOUR_DB_PASSWORD"
+    ```
+
+**Wyjaśnienie**: Backend Django łączy się bezpośrednio z bazą danych PostgreSQL, a nie przez API Supabase. Dlatego potrzebujemy standardowych danych połączeniowych, które, podobnie jak klucze frontendowe, przechowujemy w pliku `.env` dla bezpieczeństwa.
+
+### Krok 2.3: Aktualizacja ustawień Django
+
+**Cel**: Skonfigurowanie Django, aby używało bazy danych Supabase.
+
+1.  **Odszukaj plik `settings.py` w projekcie Django.** Prawdopodobna lokalizacja to `backend/myVOD/settings.py`.
+2.  Zmodyfikuj ten plik, aby załadować zmienne środowiskowe i skonfigurować połączenie z bazą danych. Upewnij się, że na początku pliku importujesz `os` i `dotenv`.
+
+    ```python
+    # backend/myVOD/settings.py
+
+    import os
+    from dotenv import load_dotenv
+
+    # ... inne importy
+
+    # Na początku pliku, po importach
+    load_dotenv()
+
+    # ...
+
+    # Znajdź i zastąp sekcję DATABASES
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'postgres',
+            'USER': 'postgres',
+            'PASSWORD': os.getenv('SUPABASE_DB_PASSWORD'),
+            'HOST': os.getenv('SUPABASE_DB_HOST'),
+            'PORT': os.getenv('SUPABASE_DB_PORT'),
+        }
+    }
+    ```
+
+**Wyjaśnienie**: Ten kod instruuje Django, aby używało sterownika `postgresql` i pobierało dane dostępowe (host, port, hasło) ze zmiennych środowiskowych, które wcześniej zdefiniowaliśmy. `NAME` i `USER` są domyślnie ustawione na `postgres` w Supabase. Dzięki temu aplikacja Django będzie mogła wykonywać operacje na bazie danych hostowanej w chmurze Supabase.
