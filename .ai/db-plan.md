@@ -172,3 +172,15 @@ The following PostgreSQL extensions need to be enabled:
 - **Soft Deletes**: The `user_movie` table uses a `watchlist_deleted_at` timestamp for soft-deleting items from a user's watchlist, preserving history.
 - **Region**: All availability data is for the 'PL' (Poland) region in the MVP. This is handled in the application logic, not with a dedicated column.
 - **External ID Mapping**: Mappings between our platform IDs and external service IDs (Watchmode, TMDB) are managed in the Django application's settings, not in the database.
+
+---
+
+## 7. Django Tables
+
+In addition to the tables defined above, the database will also contain standard tables created and managed by Django's migration system. These are essential for the framework's operation. Key tables include:
+
+- `auth_user`, `auth_group`, `auth_permission`, `auth_user_groups`, `auth_user_user_permissions`: For handling authentication and authorization.
+- `django_session`: For storing session data.
+- `django_admin_log`: For logging actions taken in the Django admin panel.
+- `django_content_type`: A core part of Django's content type framework.
+- `django_migrations`: Tracks which migrations have been applied.

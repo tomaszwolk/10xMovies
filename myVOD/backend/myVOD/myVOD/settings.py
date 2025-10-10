@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "movies",
 ]
 
 MIDDLEWARE = [
@@ -76,11 +77,12 @@ WSGI_APPLICATION = "myVOD.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Tymczasowa konfiguracja bazy danych do pracy lokalnej
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'postgres',
-        'USER': 'postgres',
+        'USER': os.getenv('SUPABASE_DB_USER', 'postgres'),
         'PASSWORD': os.getenv('SUPABASE_DB_PASSWORD'),
         'HOST': os.getenv('SUPABASE_DB_HOST'),
         'PORT': os.getenv('SUPABASE_DB_PORT'),

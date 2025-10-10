@@ -9,7 +9,7 @@ create extension if not exists "pg_trgm" with schema "extensions";
 CREATE OR REPLACE FUNCTION public.immutable_unaccent(text)
 RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT AS
 $func$
-SELECT extensions.unaccent('unaccent', $1)
+SELECT extensions.unaccent($1)
 $func$;
 
 -- create platform table

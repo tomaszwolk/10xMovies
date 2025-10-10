@@ -34,7 +34,8 @@
 - **Komponenty**:
   - PostgreSQL 15+ jako silnik
   - `psycopg2-binary` - PostgreSQL adapter
-  - Django migrations dla schema management
+  - Schemat początkowy zarządzany przez migracje Supabase
+  - Migracje Django zarządzają tabelami wbudowanymi (auth, admin, etc.)
   
 ---
 
