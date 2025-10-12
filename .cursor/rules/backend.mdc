@@ -4,6 +4,34 @@ alwaysApply: false
 ---
 ## BACKEND and DATABASE
 
+### Guidelines for DJANGO REST FRAMEWORK
+
+#### Architecture & Structure
+
+- **Service Layer Pattern**: Extract business logic from views into service classes in `backend/services/`
+- **ViewSets over APIViews**: Use ViewSets for standard CRUD operations, APIViews for custom endpoints
+- **Serializers for Validation**: Always use serializers for request/response validation, never accept raw request.data
+
+#### Error Handling
+
+- **Guard Clauses First**: Check for errors at the beginning of methods with early returns
+- **Consistent Error Responses**: Use DRF's exception classes (ValidationError, NotFound, PermissionDenied)
+- **Custom Error Codes**: For business logic errors, return Response with appropriate status codes:
+  - 400 Bad Request: Invalid input
+  - 401 Unauthorized: Missing/invalid authentication
+  - 403 Forbidden: No permission
+  - 404 Not Found: Resource doesn't exist
+  - 409 Conflict: Business rule violation (e.g., duplicate)
+  - 500 Internal Server Error: Unexpected errors
+- **Logging**: Log all 500 errors with context using Python's logging module
+
+#### Testing
+
+- **Unit Tests for Services**: Test business logic in service layer separately from API
+- **Integration Tests for APIs**: Test full request/response cycle including permissions
+- **Test Coverage**: Aim for ≥80% code coverage
+- **Test Scenarios**: Cover success cases, error cases, edge cases, and permission checks
+
 ### Guidelines for SQL
 
 - Use Supabase for backend services, including authentication and database interactions

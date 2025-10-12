@@ -141,7 +141,7 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
           "start_year": 2014,
           "genres": ["Adventure", "Drama", "Sci-Fi"],
           "avg_rating": "8.6",
-          "poster_path": "..."
+          "poster_path": "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg"
         },
         "availability": [
           {"platform_id": 1, "platform_name": "Netflix", "is_available": true}
@@ -164,7 +164,31 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
     ```
 
 -   **Success Response** (201 Created): Returns the newly created `user-movie` object.
+  ```json
+  {
+    "id": 102,
+    "movie": {
+      "tconst": "tt0816692",
+      "primary_title": "Interstellar",
+      "start_year": 2014,
+      "genres": ["Adventure", "Drama", "Sci-Fi"],
+      "avg_rating": "8.6",
+      "poster_path": "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg"
+    },
+    "availability": [
+      {"platform_id": 1, "platform_name": "Netflix", "is_available": true},
+      {"platform_id": 2, "platform_name": "HBO Max", "is_available": false}
+    ],
+    "watchlisted_at": "2025-10-12T14:30:00Z",
+    "watched_at": null
+  }
+  ```
 -   **Error Responses**:
+    -   `400 Bad Request`:
+        - Missing `tconst` field in request body
+        - Movie with given `tconst` does not exist in database
+        - Invalid `tconst` format
+    -   `401 Unauthorized`: Not authorized.
     -   `409 Conflict`: Movie is already on the watchlist.
 
 #### `PATCH /api/user-movies/<id>/`
