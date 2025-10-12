@@ -92,7 +92,7 @@ Po potwierdzeniu, że wymagania są spełnione, przejdź do następnego kroku.
     npx supabase gen types typescript --linked > frontend/src/types/database.types.ts
     ```
 
-**Wyjaśnienie**: Ta komenda łączy się z Twoim projektem Supabase, analizuje schemat bazy danych (tabele, kolumny, relacje) i generuje plik `database.types.ts`. Dzięki temu plikowi, podczas pisania zapytań w kodzie (np. `supabaseClient.from('users').select()`), TypeScript będzie znał wszystkie dostępne tabele i kolumny, co eliminuje literówki i błędy.
+**Wyjaśnienie**: Ta komenda łączy się z Twoim projektem Supabase, analizuje schemat bazy danych (tabele, kolumny, relacje) i generuje plik `database.types.ts`. Dzięki temu plikowi, podczas pisania zapytań w kodzie (np. `supabaseClient.from('users').select()`), TypeScript będzie znał wszystkie dostępne tabele i kolumny, co eliminuje literówki i błędy. 
 
 ---
 
