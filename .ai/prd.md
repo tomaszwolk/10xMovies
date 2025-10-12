@@ -140,7 +140,6 @@ Nice-to-have (niski priorytet MVP):
 Opis: Centralne miejsce do zarządzania filmami do obejrzenia
 
 Funkcjonalności podstawowe:
-- Limit 10 filmów na watchliście w MVP
 - Dodawanie filmów przez wyszukiwarkę
 - Usuwanie filmów z watchlisty (soft delete z flagą deleted_at)
 - Confirm dialog przed usunięciem
@@ -346,7 +345,7 @@ Usuwanie konta:
 Funkcjonalności:
 - Baza danych filmów z IMDb (jednorazowy import)
 - Wyszukiwarka z autocomplete
-- Zarządzanie watchlistą (limit 10 filmów)
+- Zarządzanie watchlistą
 - Integracja z Watchmode.com API
 - System kont (email + hasło)
 - Profil użytkownika z preferencjami platform VOD
@@ -359,7 +358,6 @@ Funkcjonalności:
 Ograniczenia MVP:
 - Tylko filmy (titleType = 'movie')
 - Tylko tytuły oryginalne (primaryTitle)
-- Limit 10 filmów na watchliście
 - Limit 1 sugestia AI dziennie
 - 5 platform VOD (Netflix, HBO Max, Disney+, Prime Video, Apple TV+)
 - Cotygodniowa aktualizacja dostępności VOD
@@ -586,16 +584,6 @@ Kryteria akceptacji:
 - Sugestia alternatywna: "Spróbuj wpisać tytuł oryginalny filmu"
 - Dropdown pozostaje otwarty z komunikatem
 - Brak możliwości dodania filmu spoza bazy IMDb (zgodnie z MVP scope)
-
-US-011: Dodanie filmu przy limicie watchlisty
-Jako użytkownik z 10 filmami na watchliście chcę dodać kolejny film, aby otrzymać informację o limicie.
-
-Kryteria akceptacji:
-- Przy próbie dodania 11-go filmu pojawia się komunikat błędu
-- Komunikat: "Osiągnąłeś limit 10 filmów na watchliście. Usuń film aby dodać nowy."
-- Film nie jest dodawany do watchlisty
-- Użytkownik pozostaje na tej samej stronie
-- Licznik "10/10" jest widoczny przy watchliście
 
 ### 5.5 Zarządzanie watchlistą
 
