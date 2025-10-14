@@ -157,3 +157,18 @@ Po potwierdzeniu, że wymagania są spełnione, przejdź do następnego kroku.
     ```
 
 **Wyjaśnienie**: Ten kod instruuje Django, aby używało sterownika `postgresql` i pobierało wszystkie dane dostępowe (host, port, użytkownika i hasło) ze zmiennych środowiskowych, które wcześniej zdefiniowaliśmy. `NAME` jest domyślnie ustawione na `postgres` w Supabase. Dzięki temu aplikacja Django będzie mogła wykonywać operacje na bazie danych hostowanej w chmurze Supabase.
+
+### Krok 2.4: Zastosowanie własnych migracji SQL (Supabase CLI)
+
+**Cel**: Wdrożenie zmian schematu niestandardowymi migracjami (np. dodanie kluczy zastępczych `id`).
+
+1. Upewnij się, że projekt jest połączony (`npx supabase link --project-ref <your-project-ref>`).
+2. Uruchom:
+
+    ```bash
+    supabase db push
+    ```
+
+3. Zatwierdź migracje w promptcie CLI.
+
+**Wyjaśnienie**: `supabase db push` wypchnie pliki z katalogu `myVOD/supabase/migrations/` do zdalnej bazy. Używamy tego, gdy schema jest zarządzana poza Django ORM (unmanaged models).

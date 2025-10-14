@@ -125,11 +125,11 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
 #### `GET /api/user-movies/`
 
 -   **Description**: Retrieves the user's watchlist or watched history.
--   **Authentication**: Required.
+-   **Authentication**: Required (returns 403 when unauthenticated).
 -   **Query Parameters**:
     -   `status` (string, required): `watchlist` or `watched`.
-    -   `ordering` (string): Field to sort by (e.g., `-watchlisted_at`, `-movie__avg_rating`).
-    -   `is_available` (boolean): Filter for movies available on the user's platforms.
+    -   `ordering` (string, optional): Allow-listed values: `-watchlisted_at`, `-tconst__avg_rating`.
+    -   `is_available` (boolean, optional): If `true`, filter to movies available on at least one of the user's platforms; if `false`, filter to movies explicitly unavailable on all of the user's platforms (and with no `true` availability records). When omitted, no availability filter is applied.
 -   **Success Response** (200 OK for `?status=watchlist`):
     ```json
     [
@@ -150,7 +150,9 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
       }
     ]
     ```
-
+-   **Error Responses**:
+    - `400 Bad Request`: Missing/invalid `status`; invalid `ordering`; invalid `is_available` boolean.
+    - `403 Forbidden`: Missing or invalid authentication.
 
 #### `POST /api/user-movies/`
 
@@ -188,7 +190,7 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
         - Missing `tconst` field in request body
         - Movie with given `tconst` does not exist in database
         - Invalid `tconst` format
-    -   `401 Unauthorized`: Not authorized.
+    -   `403 Forbidden`: Not authenticated.
     -   `409 Conflict`: Movie is already on the watchlist.
 
 #### `PATCH /api/user-movies/<id>/`
@@ -241,7 +243,6 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
       ]
     }
     ```
-
 -   **Error Responses**:
     -   `429 Too Many Requests`: User has exceeded the 24-hour limit.
     -   `404 Not Found`: User has no movies on their watchlist or watched history to base suggestions on.

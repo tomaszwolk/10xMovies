@@ -4,6 +4,10 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 from movies.models import Movie, Platform, UserMovie, MovieAvailability, UserPlatform
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 
 class UserMovieAPITests(APITestCase):
@@ -13,7 +17,7 @@ class UserMovieAPITests(APITestCase):
         # To make these tests pass, you MUST replace this placeholder UUID
         # with a REAL user UUID from your development database's 'auth.users' table.
         # You can get one by signing up a test user in your application.
-        self.test_user_id = uuid.UUID('b628854d-e0fe-43ee-a485-6d75feceb0cd')
+        self.test_user_id = uuid.UUID(os.getenv('TEST_USER'))
         # Create mock user object
         self.user1 = Mock()
         self.user1.id = self.test_user_id
@@ -45,10 +49,34 @@ class UserMovieAPITests(APITestCase):
         MovieAvailability.objects.get_or_create(tconst=self.movie2, platform=self.platform1, defaults={'is_available': False, 'last_checked': '2023-10-01T10:00:00Z', 'source': 'test'})
         MovieAvailability.objects.get_or_create(tconst=self.movie3, platform=self.platform2, defaults={'is_available': True, 'last_checked': '2023-10-01T10:00:00Z', 'source': 'test'})
 
-        # User 1 Movies
-        UserMovie.objects.get_or_create(user_id=self.user1.id, tconst=self.movie1, defaults={'watchlisted_at': '2023-10-01T10:00:00Z'})
-        UserMovie.objects.get_or_create(user_id=self.user1.id, tconst=self.movie2, defaults={'watched_at': '2023-10-02T10:00:00Z'})
-        UserMovie.objects.get_or_create(user_id=self.user1.id, tconst=self.movie3, defaults={'watchlisted_at': '2023-10-03T10:00:00Z'})
+        # User 1 Movies (force deterministic state)
+        UserMovie.objects.update_or_create(
+            user_id=self.user1.id,
+            tconst=self.movie1,
+            defaults={
+                'watchlisted_at': '2023-10-01T10:00:00Z',
+                'watchlist_deleted_at': None,
+                'watched_at': None,
+            },
+        )
+        UserMovie.objects.update_or_create(
+            user_id=self.user1.id,
+            tconst=self.movie2,
+            defaults={
+                'watched_at': '2023-10-02T10:00:00Z',
+                'watchlisted_at': None,
+                'watchlist_deleted_at': None,
+            },
+        )
+        UserMovie.objects.update_or_create(
+            user_id=self.user1.id,
+            tconst=self.movie3,
+            defaults={
+                'watchlisted_at': '2023-10-03T10:00:00Z',
+                'watchlist_deleted_at': None,
+                'watched_at': None,
+            },
+        )
 
         self.url = reverse('usermovie-list')
 
@@ -92,5 +120,28 @@ class UserMovieAPITests(APITestCase):
     def test_other_user_cannot_see_data(self):
         self.client.force_authenticate(user=self.user2)
         response = self.client.get(self.url, {'status': 'watchlist'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+    def test_invalid_ordering_parameter_returns_400(self):
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(self.url, {'status': 'watchlist', 'ordering': 'primary_title'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_invalid_is_available_parameter_returns_400(self):
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(self.url, {'status': 'watchlist', 'is_available': 'foo'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_is_available_false_for_watched(self):
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(self.url, {'status': 'watched', 'is_available': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['movie']['tconst'], self.movie2.tconst)
+
+    def test_is_available_false_for_watchlist_returns_empty(self):
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(self.url, {'status': 'watchlist', 'is_available': 'false'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 0)

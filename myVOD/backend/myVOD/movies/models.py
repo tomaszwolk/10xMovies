@@ -40,7 +40,8 @@ class Movie(models.Model):
 
 
 class UserPlatform(models.Model):
-    user_id = models.UUIDField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
+    user_id = models.UUIDField()
     platform = models.ForeignKey(Platform, models.DO_NOTHING)
 
     class Meta:
@@ -65,7 +66,8 @@ class UserMovie(models.Model):
 
 
 class MovieAvailability(models.Model):
-    tconst = models.ForeignKey(Movie, models.DO_NOTHING, db_column='tconst', primary_key=True, related_name='availability_entries')
+    id = models.BigAutoField(primary_key=True)
+    tconst = models.ForeignKey(Movie, models.DO_NOTHING, db_column='tconst', related_name='availability_entries')
     platform = models.ForeignKey(Platform, models.DO_NOTHING)
     is_available = models.BooleanField(blank=True, null=True)
     last_checked = models.DateTimeField()

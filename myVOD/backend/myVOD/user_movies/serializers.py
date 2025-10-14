@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from movies.models import Movie, MovieAvailability, Platform, UserMovie
+from movies.models import Movie, MovieAvailability, UserMovie
 
 
 class MovieSerializer(serializers.ModelSerializer):
@@ -30,3 +30,18 @@ class UserMovieSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserMovie
         fields = ["id", "movie", "availability", "watchlisted_at", "watched_at"]
+
+
+class UserMovieQueryParamsSerializer(serializers.Serializer):
+    """Validates query parameters for GET /api/user-movies/.
+
+    - status: required, one of ['watchlist', 'watched']
+    - ordering: optional, allow-listed fields
+    - is_available: optional boolean
+    """
+
+    status = serializers.ChoiceField(choices=["watchlist", "watched"], required=True)
+    ordering = serializers.ChoiceField(
+        choices=["-watchlisted_at", "-tconst__avg_rating"], required=False
+    )
+    is_available = serializers.BooleanField(required=False)

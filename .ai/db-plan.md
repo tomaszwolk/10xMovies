@@ -25,8 +25,10 @@ Links users to their subscribed VOD platforms (M:N relationship).
 
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
-| `user_id` | `uuid` | **Primary Key**, **Foreign Key** -> `auth.users(id)` ON DELETE CASCADE | User's identifier. |
-| `platform_id` | `smallint` | **Primary Key**, **Foreign Key** -> `platform(id)` ON DELETE CASCADE | Platform's identifier. |
+| `id` | `bigint` | **Primary Key**, Identity | Surrogate key for the row. |
+| `user_id` | `uuid` | **Foreign Key** -> `auth.users(id)` ON DELETE CASCADE, Not Null | User's identifier. |
+| `platform_id` | `smallint` | **Foreign Key** -> `platform(id)` ON DELETE CASCADE, Not Null | Platform's identifier. |
+| | | **Unique** (`user_id`, `platform_id`) | Ensures a user can only subscribe to each platform once. |
 
 ---
 
@@ -72,12 +74,14 @@ Stores the availability of movies on different VOD platforms for the 'PL' region
 
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
-| `tconst` | `text` | **Primary Key**, **Foreign Key** -> `movie(tconst)` ON DELETE CASCADE | Movie identifier. |
-| `platform_id` | `smallint` | **Primary Key**, **Foreign Key** -> `platform(id)` ON DELETE CASCADE | Platform identifier. |
+| `id` | `bigint` | **Primary Key**, Identity | Surrogate key for the row. |
+| `tconst` | `text` | **Foreign Key** -> `movie(tconst)` ON DELETE CASCADE, Not Null | Movie identifier. |
+| `platform_id` | `smallint` | **Foreign Key** -> `platform(id)` ON DELETE CASCADE, Not Null | Platform identifier. |
 | `is_available` | `boolean` | | Tri-state: `true` (available), `false` (unavailable), `null` (unknown). |
 | `last_checked` | `timestamptz` | Not Null | Timestamp of the last availability check. |
 | `source` | `text` | Not Null | The source of the availability data (e.g., "watchmode"). |
 | `details` | `jsonb` | | Additional details from the source API (e.g., deep links). |
+| | | **Unique** (`tconst`, `platform_id`) | Ensures one row per movie+platform. |
 
 ---
 
