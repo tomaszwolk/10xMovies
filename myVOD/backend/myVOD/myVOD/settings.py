@@ -41,7 +41,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
     "movies",
+    "user_movies",
 ]
 
 MIDDLEWARE = [
@@ -86,6 +88,9 @@ DATABASES = {
         'PASSWORD': os.getenv('SUPABASE_DB_PASSWORD'),
         'HOST': os.getenv('SUPABASE_DB_HOST'),
         'PORT': os.getenv('SUPABASE_DB_PORT'),
+        'TEST': {
+            'MIRROR': 'default',
+        }
     }
 }
 

@@ -8,6 +8,7 @@ import uuid
 # Logika łączenia tych modeli z użytkownikiem będzie musiała być
 # zaimplementowana w widokach/serwisach.
 
+
 class Platform(models.Model):
     id = models.SmallAutoField(primary_key=True)
     platform_slug = models.TextField(unique=True)
@@ -16,6 +17,7 @@ class Platform(models.Model):
     class Meta:
         managed = False
         db_table = 'platform'
+
 
 class Movie(models.Model):
     tconst = models.TextField(primary_key=True)
@@ -36,14 +38,16 @@ class Movie(models.Model):
         managed = False
         db_table = 'movie'
 
+
 class UserPlatform(models.Model):
-    user_id = models.UUIDField()
+    user_id = models.UUIDField(primary_key=True)
     platform = models.ForeignKey(Platform, models.DO_NOTHING)
 
     class Meta:
         managed = False
         db_table = 'user_platform'
         unique_together = (('user_id', 'platform'),)
+
 
 class UserMovie(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -59,8 +63,9 @@ class UserMovie(models.Model):
         db_table = 'user_movie'
         unique_together = (('user_id', 'tconst'),)
 
+
 class MovieAvailability(models.Model):
-    tconst = models.OneToOneField(Movie, models.DO_NOTHING, db_column='tconst', primary_key=True)
+    tconst = models.ForeignKey(Movie, models.DO_NOTHING, db_column='tconst', primary_key=True, related_name='availability_entries')
     platform = models.ForeignKey(Platform, models.DO_NOTHING)
     is_available = models.BooleanField(blank=True, null=True)
     last_checked = models.DateTimeField()
@@ -71,6 +76,7 @@ class MovieAvailability(models.Model):
         managed = False
         db_table = 'movie_availability'
         unique_together = (('tconst', 'platform'),)
+
 
 class AiSuggestionBatch(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -83,6 +89,7 @@ class AiSuggestionBatch(models.Model):
     class Meta:
         managed = False
         db_table = 'ai_suggestion_batch'
+
 
 class Event(models.Model):
     id = models.BigAutoField(primary_key=True)
