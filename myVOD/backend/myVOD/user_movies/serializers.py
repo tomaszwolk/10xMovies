@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from movies.models import Movie, MovieAvailability, UserMovie
+from movies.models import Movie, MovieAvailability, UserMovie  # type: ignore
 
 
 class MovieSerializer(serializers.ModelSerializer):
@@ -28,11 +28,16 @@ class MovieAvailabilitySerializer(serializers.ModelSerializer):
 
 class UserMovieSerializer(serializers.ModelSerializer):
     movie = MovieSerializer(source="tconst")
-    availability = MovieAvailabilitySerializer(many=True, read_only=True, source="availability_filtered")
+    availability = serializers.SerializerMethodField()
 
     class Meta:
         model = UserMovie
         fields = ["id", "movie", "availability", "watchlisted_at", "watched_at"]
+
+    def get_availability(self, obj):
+        """Get availability data from prefetched attribute or return empty list."""
+        availability_data = getattr(obj, 'availability_filtered', [])
+        return MovieAvailabilitySerializer(availability_data, many=True).data
 
 
 class UserMovieQueryParamsSerializer(serializers.Serializer):
@@ -48,3 +53,35 @@ class UserMovieQueryParamsSerializer(serializers.Serializer):
         choices=["-watchlisted_at", "-tconst__avg_rating"], required=False
     )
     is_available = serializers.BooleanField(required=False, allow_null=True, default=None)
+
+
+class AddUserMovieCommandSerializer(serializers.Serializer):
+    """Command serializer for adding a movie to user's watchlist.
+
+    Corresponds to AddUserMovieCommand type in TypeScript.
+    Validates that tconst is provided and has valid format.
+    """
+    tconst = serializers.RegexField(
+        regex=r'^tt\d{7,8}$',
+        required=True,
+        error_messages={
+            'required': 'tconst field is required',
+            'invalid': 'Invalid tconst format. Expected format: tt followed by 7-8 digits (e.g., tt0816692)'
+        }
+    )
+
+
+class UpdateUserMovieCommandSerializer(serializers.Serializer):
+    """Command serializer for updating a user-movie entry (PATCH).
+
+    Corresponds to UpdateUserMovieCommand type in TypeScript.
+    Validates that action is one of the allowed values.
+    """
+    action = serializers.ChoiceField(
+        choices=['mark_as_watched', 'restore_to_watchlist'],
+        required=True,
+        error_messages={
+            'required': 'action field is required',
+            'invalid_choice': 'Invalid action. Must be "mark_as_watched" or "restore_to_watchlist"'
+        }
+    )

@@ -1,5 +1,36 @@
 from django.db.models import Prefetch, Exists, OuterRef
-from movies.models import UserMovie, MovieAvailability, UserPlatform
+from django.db import transaction
+from django.utils import timezone
+from movies.models import UserMovie, MovieAvailability, UserPlatform, Movie
+
+
+def _get_supabase_user_uuid(email: str):
+    """
+    Get the Supabase UUID for a user by email from auth.users table.
+
+    Args:
+        email: User email address
+
+    Returns:
+        UUID string of the Supabase user, or None if not found
+    """
+    from django.db import connection
+
+    try:
+        with connection.cursor() as cursor:
+            # Query directly from auth schema
+            cursor.execute(
+                "SELECT id FROM auth.users WHERE email = %s LIMIT 1",
+                [email]
+            )
+            row = cursor.fetchone()
+
+            if row:
+                return str(row[0])
+            return None
+
+    except Exception as e:
+        raise Exception(f"Error fetching Supabase user: {str(e)}")
 
 
 def _get_user_platform_ids(user_id):
@@ -72,3 +103,181 @@ def build_user_movies_queryset(
         queryset = queryset.order_by(ordering_param)
 
     return queryset
+
+
+@transaction.atomic
+def add_movie_to_watchlist(*, user, tconst: str):
+    """Adds a movie to user's watchlist or restores a soft-deleted entry.
+
+    Business Logic:
+    - Validates that the movie exists in the database
+    - Checks for duplicate active watchlist entries (raises ValueError if found)
+    - Restores soft-deleted entries if they exist
+    - Creates new entries with watchlisted_at set to current timestamp
+    - Returns the created/restored UserMovie instance with prefetched data
+
+    Args:
+        user: The authenticated user object with `email` attribute
+        tconst: The IMDb movie identifier (e.g., 'tt0816692')
+
+    Returns:
+        UserMovie: The created or restored user_movie instance with:
+            - tconst (Movie) prefetched via select_related
+            - availability_filtered prefetched for user's platforms
+
+    Raises:
+        Movie.DoesNotExist: If the movie with given tconst doesn't exist
+        ValueError: If the movie is already on user's active watchlist
+        Exception: If Supabase user not found
+    """
+    # Get Supabase UUID for the user
+    supabase_user_uuid = _get_supabase_user_uuid(user.email)
+    if not supabase_user_uuid:
+        raise Exception(f"Supabase user not found for email: {user.email}")
+
+    # Guard clause: Validate movie exists
+    if not Movie.objects.filter(tconst=tconst).exists():
+        raise Movie.DoesNotExist(f"Movie with tconst '{tconst}' does not exist in database")
+
+    # Guard clause: Check for duplicate active watchlist entry
+    existing_active = UserMovie.objects.filter(
+        user_id=supabase_user_uuid,
+        tconst=tconst,
+        watchlisted_at__isnull=False,
+        watchlist_deleted_at__isnull=True
+    ).first()
+
+    if existing_active:
+        raise ValueError("Movie is already on the watchlist")
+
+    # Check if soft-deleted entry exists (restore it)
+    soft_deleted = UserMovie.objects.filter(
+        user_id=supabase_user_uuid,
+        tconst=tconst,
+        watchlist_deleted_at__isnull=False
+    ).first()
+
+    if soft_deleted:
+        # Restore soft-deleted entry
+        soft_deleted.watchlisted_at = timezone.now()
+        soft_deleted.watchlist_deleted_at = None
+        soft_deleted.save()
+        user_movie = soft_deleted
+    else:
+        # Create new entry
+        user_movie = UserMovie.objects.create(
+            user_id=supabase_user_uuid,
+            tconst_id=tconst,
+            watchlisted_at=timezone.now(),
+            watchlist_deleted_at=None,
+            watched_at=None,
+            added_from_ai_suggestion=False
+        )
+
+    # Fetch with related data for response
+    platform_ids = _get_user_platform_ids(supabase_user_uuid)
+
+    availability_prefetch = Prefetch(
+        'tconst__availability_entries',
+        queryset=MovieAvailability.objects.filter(
+            platform_id__in=platform_ids
+        ).select_related('platform'),
+        to_attr='availability_filtered'
+    )
+
+    # Re-fetch the instance with all required prefetch/select_related
+    user_movie = (
+        UserMovie.objects
+        .filter(id=user_movie.id)
+        .select_related('tconst')
+        .prefetch_related(availability_prefetch)
+        .first()
+    )
+
+    return user_movie
+
+
+@transaction.atomic
+def update_user_movie(*, user, user_movie_id: int, action: str):
+    """Updates a user-movie entry to mark as watched or restore to watchlist.
+
+    Business Logic:
+    - Authorization: Ensures the user_movie belongs to the authenticated user
+    - mark_as_watched: Sets watched_at to current timestamp
+      - Precondition: Movie must be on watchlist and NOT already watched
+      - Preserves watchlisted_at (does not change original watchlist date)
+    - restore_to_watchlist: Clears watched_at (sets to NULL)
+      - Precondition: Movie must be marked as watched
+    - Returns the updated UserMovie with full data (movie, availability)
+
+    Args:
+        user: The authenticated user object with `email` attribute
+        user_movie_id: The ID of the user_movie entry to update
+        action: 'mark_as_watched' or 'restore_to_watchlist'
+
+    Returns:
+        UserMovie: The updated user_movie instance with:
+            - tconst (Movie) prefetched via select_related
+            - availability_filtered prefetched for user's platforms
+
+    Raises:
+        UserMovie.DoesNotExist: If user_movie not found or doesn't belong to user
+        ValueError: If business logic preconditions are violated
+        Exception: If Supabase user not found
+    """
+    # Get Supabase UUID for the user
+    supabase_user_uuid = _get_supabase_user_uuid(user.email)
+    if not supabase_user_uuid:
+        raise Exception(f"Supabase user not found for email: {user.email}")
+
+    # Guard clause: Fetch the user_movie and ensure it belongs to authenticated user
+    try:
+        user_movie = UserMovie.objects.get(id=user_movie_id, user_id=supabase_user_uuid)
+    except UserMovie.DoesNotExist:
+        raise UserMovie.DoesNotExist(
+            f"UserMovie with id {user_movie_id} not found or does not belong to user"
+        )
+
+    # Handle mark_as_watched action
+    if action == 'mark_as_watched':
+        # Precondition: Movie must be on watchlist (not soft-deleted) and NOT watched
+        if user_movie.watchlisted_at is None or user_movie.watchlist_deleted_at is not None:
+            raise ValueError("Movie must be on watchlist to mark as watched")
+        if user_movie.watched_at is not None:
+            raise ValueError("Movie is already marked as watched")
+
+        # Update watched_at to current timestamp
+        user_movie.watched_at = timezone.now()
+        user_movie.save(update_fields=['watched_at'])
+
+    # Handle restore_to_watchlist action
+    elif action == 'restore_to_watchlist':
+        # Precondition: Movie must be marked as watched
+        if user_movie.watched_at is None:
+            raise ValueError("Movie is not marked as watched, cannot restore to watchlist")
+
+        # Clear watched_at (set to NULL)
+        user_movie.watched_at = None
+        user_movie.save(update_fields=['watched_at'])
+
+    # Fetch with related data for response
+    platform_ids = _get_user_platform_ids(supabase_user_uuid)
+
+    availability_prefetch = Prefetch(
+        'tconst__availability_entries',
+        queryset=MovieAvailability.objects.filter(
+            platform_id__in=platform_ids
+        ).select_related('platform'),
+        to_attr='availability_filtered'
+    )
+
+    # Re-fetch the instance with all required prefetch/select_related
+    user_movie = (
+        UserMovie.objects
+        .filter(id=user_movie.id)
+        .select_related('tconst')
+        .prefetch_related(availability_prefetch)
+        .first()
+    )
+
+    return user_movie
