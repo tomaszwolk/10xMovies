@@ -3,32 +3,26 @@ from unittest.mock import Mock, patch
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
-from movies.models import Movie, Platform, UserMovie, MovieAvailability, UserPlatform  # type: ignore
+from movies.models import Movie, Platform, UserMovie, MovieAvailability, UserPlatform
 from dotenv import load_dotenv
 import os
+from django.utils import timezone
 
 load_dotenv()
 
 
 class UserMovieAPITests(APITestCase):
     def setUp(self):
-        # !!! IMPORTANT !!!
-        # To make these tests pass, you MUST replace this placeholder UUID
-        # with a REAL user UUID from your development database's 'auth.users' table.
-        # You can get one by signing up a test user in your application.
         self.test_user_id = uuid.UUID(os.getenv("TEST_USER"))
-        # Create mock user object
         self.user1 = Mock()
         self.user1.id = self.test_user_id
         self.user1.is_authenticated = True
 
-        # This second user mock is for testing data isolation
         self.user2 = Mock()
-        self.user2.id = uuid.uuid4()  # A random, non-existent user
+        self.user2.id = uuid.uuid4()
         self.user2.is_authenticated = True
         self.user2.userplatform_set.values_list.return_value = []
 
-        # Create Movies
         self.movie1, _ = Movie.objects.get_or_create(
             tconst="tt0000001", defaults={"primary_title": "Movie 1", "avg_rating": 8.5}
         )
@@ -39,7 +33,6 @@ class UserMovieAPITests(APITestCase):
             tconst="tt0000003", defaults={"primary_title": "Movie 3", "avg_rating": 7.0}
         )
 
-        # Create Platforms
         self.platform1, _ = Platform.objects.get_or_create(
             id=1, defaults={"platform_slug": "netflix", "platform_name": "Netflix"}
         )
@@ -47,15 +40,12 @@ class UserMovieAPITests(APITestCase):
             id=2, defaults={"platform_slug": "hbo", "platform_name": "HBO"}
         )
 
-        # Configure the mock to behave like a real user model regarding relations
         self.user1.userplatform_set.values_list.return_value = [self.platform1.id]
 
-        # User 1 Platform
         UserPlatform.objects.get_or_create(
             user_id=self.user1.id, platform_id=self.platform1.id
         )
 
-        # Movie Availability
         MovieAvailability.objects.get_or_create(
             tconst=self.movie1,
             platform=self.platform1,
@@ -84,7 +74,6 @@ class UserMovieAPITests(APITestCase):
             },
         )
 
-        # User 1 Movies (force deterministic state)
         UserMovie.objects.update_or_create(
             user_id=self.user1.id,
             tconst=self.movie1,
@@ -117,7 +106,6 @@ class UserMovieAPITests(APITestCase):
 
     def test_authentication_required(self):
         response = self.client.get(self.url)
-        # 401 is correct for missing authentication (not 403)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_get_watchlist(self):
@@ -196,21 +184,15 @@ class UserMovieAPITests(APITestCase):
 
 
 class UserMoviePostAPITests(APITestCase):
-    """Tests for POST /api/user-movies/ endpoint (add to watchlist)"""
+    """Tests for POST /api/user-movies/ endpoint"""
 
     def setUp(self):
-        # Load test user from environment (real Django user)
         self.test_user_id = uuid.UUID(os.getenv("TEST_USER"))
-
-        # Use real Django user instead of Mock
-        # The test user should exist in both:
-        # - Django's auth_user table
-        # - Supabase's auth.users table
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
         self.user1, _ = User.objects.get_or_create(
-            id=46,  # Django user ID
+            id=46,
             defaults={
                 'email': 'test@example.com',
                 'username': 'testuser',
@@ -218,12 +200,10 @@ class UserMoviePostAPITests(APITestCase):
             }
         )
 
-        # Mock the Supabase user lookup to return our test_user_id
         self.patcher = patch('services.user_movies_service._get_supabase_user_uuid')
         self.mock_get_uuid = self.patcher.start()
         self.mock_get_uuid.return_value = str(self.test_user_id)
 
-        # Create test movies
         self.movie1, _ = Movie.objects.get_or_create(
             tconst="tt0111161", defaults={"primary_title": "The Shawshank Redemption", "avg_rating": 9.3}
         )
@@ -234,7 +214,6 @@ class UserMoviePostAPITests(APITestCase):
             tconst="tt0071562", defaults={"primary_title": "The Godfather Part II", "avg_rating": 9.0}
         )
 
-        # Create platforms
         self.platform1, _ = Platform.objects.get_or_create(
             id=1, defaults={"platform_slug": "netflix", "platform_name": "Netflix"}
         )
@@ -242,7 +221,6 @@ class UserMoviePostAPITests(APITestCase):
             id=2, defaults={"platform_slug": "hbo", "platform_name": "HBO Max"}
         )
 
-        # User platforms
         UserPlatform.objects.get_or_create(
             user_id=self.test_user_id, platform_id=self.platform1.id
         )
@@ -250,7 +228,6 @@ class UserMoviePostAPITests(APITestCase):
             user_id=self.test_user_id, platform_id=self.platform2.id
         )
 
-        # Movie availability
         MovieAvailability.objects.get_or_create(
             tconst=self.movie1,
             platform=self.platform1,
@@ -270,18 +247,16 @@ class UserMoviePostAPITests(APITestCase):
             },
         )
 
-        # Create soft-deleted entry for restoration test
         UserMovie.objects.update_or_create(
             user_id=self.test_user_id,
             tconst=self.movie_for_restore,
             defaults={
                 "watchlisted_at": "2023-10-01T10:00:00Z",
-                "watchlist_deleted_at": "2023-10-05T10:00:00Z",  # Soft-deleted
+                "watchlist_deleted_at": "2023-10-05T10:00:00Z",
                 "watched_at": None,
             },
         )
 
-        # Movie already on watchlist for duplicate test
         self.existing_movie, _ = Movie.objects.get_or_create(
             tconst="tt0468569", defaults={"primary_title": "The Dark Knight", "avg_rating": 9.0}
         )
@@ -298,48 +273,37 @@ class UserMoviePostAPITests(APITestCase):
         self.url = reverse("usermovie-list")
 
     def tearDown(self):
-        """Stop the patcher after each test"""
         self.patcher.stop()
 
     def test_post_authentication_required(self):
-        """Test that POST requires authentication"""
         response = self.client.post(self.url, {"tconst": "tt0111161"})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_post_add_movie_successfully(self):
-        """Test successfully adding a movie to watchlist"""
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(self.url, {"tconst": "tt0111161"}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        # Verify response structure
         self.assertIn("id", response.data)
         self.assertIn("movie", response.data)
         self.assertIn("availability", response.data)
         self.assertIn("watchlisted_at", response.data)
         self.assertIn("watched_at", response.data)
 
-        # Verify movie details
         self.assertEqual(response.data["movie"]["tconst"], "tt0111161")
         self.assertEqual(response.data["movie"]["primary_title"], "The Shawshank Redemption")
         self.assertEqual(response.data["movie"]["avg_rating"], "9.3")
 
-        # Verify availability is present (as list, may be empty)
         self.assertIsInstance(response.data["availability"], list)
-
-        # Verify timestamps
         self.assertIsNotNone(response.data["watchlisted_at"])
         self.assertIsNone(response.data["watched_at"])
 
-        # Verify database state - use self.test_user_id (Supabase UUID)
         user_movie = UserMovie.objects.get(user_id=self.test_user_id, tconst="tt0111161")
         self.assertIsNotNone(user_movie.watchlisted_at)
         self.assertIsNone(user_movie.watchlist_deleted_at)
         self.assertIsNone(user_movie.watched_at)
 
     def test_post_missing_tconst(self):
-        """Test POST with missing tconst field"""
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(self.url, {}, format="json")
 
@@ -347,16 +311,14 @@ class UserMoviePostAPITests(APITestCase):
         self.assertIn("tconst", response.data)
 
     def test_post_invalid_tconst_format(self):
-        """Test POST with invalid tconst format"""
         self.client.force_authenticate(user=self.user1)
 
-        # Test various invalid formats
         invalid_tconsts = [
-            "invalid",           # Not starting with 'tt'
-            "tt123",             # Too few digits
-            "tt123456789",       # Too many digits
-            "123456789",         # Missing 'tt' prefix
-            "tt12345a7",         # Contains letter in digits
+            "invalid",
+            "tt123",
+            "tt123456789",
+            "123456789",
+            "tt12345a7",
         ]
 
         for invalid_tconst in invalid_tconsts:
@@ -365,7 +327,6 @@ class UserMoviePostAPITests(APITestCase):
             self.assertIn("tconst", response.data)
 
     def test_post_movie_not_found(self):
-        """Test POST with non-existent movie"""
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(self.url, {"tconst": "tt9999999"}, format="json")
 
@@ -374,7 +335,6 @@ class UserMoviePostAPITests(APITestCase):
         self.assertIn("does not exist", str(response.data["tconst"]))
 
     def test_post_duplicate_movie_conflict(self):
-        """Test POST with movie already on watchlist returns 409 Conflict"""
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(self.url, {"tconst": "tt0468569"}, format="json")
 
@@ -383,49 +343,36 @@ class UserMoviePostAPITests(APITestCase):
         self.assertIn("already on the watchlist", str(response.data["detail"]))
 
     def test_post_restore_soft_deleted_movie(self):
-        """Test POST restores soft-deleted movie entry"""
         self.client.force_authenticate(user=self.user1)
 
-        # Verify movie is soft-deleted before POST - use self.test_user_id
         user_movie_before = UserMovie.objects.get(
             user_id=self.test_user_id, tconst="tt0071562"
         )
         self.assertIsNotNone(user_movie_before.watchlist_deleted_at)
 
-        # POST to restore
         response = self.client.post(self.url, {"tconst": "tt0071562"}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Verify response
         self.assertEqual(response.data["movie"]["tconst"], "tt0071562")
         self.assertIsNotNone(response.data["watchlisted_at"])
         self.assertIsNone(response.data["watched_at"])
 
-        # Verify database state - movie is restored - use self.test_user_id
         user_movie_after = UserMovie.objects.get(
             user_id=self.test_user_id, tconst="tt0071562"
         )
         self.assertIsNotNone(user_movie_after.watchlisted_at)
-        self.assertIsNone(user_movie_after.watchlist_deleted_at)  # Restored!
+        self.assertIsNone(user_movie_after.watchlist_deleted_at)
 
     def test_post_user_isolation(self):
-        """Test that users can add the same movie independently"""
-        # User 1 adds a movie
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(self.url, {"tconst": "tt0068646"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Verify movie was added for user 1 - use self.test_user_id
         user1_movie = UserMovie.objects.filter(user_id=self.test_user_id, tconst="tt0068646").first()
         self.assertIsNotNone(user1_movie)
 
-        # Note: Testing isolation between different real users would require
-        # multiple test user accounts in the database
-
     def test_post_with_no_availability_data(self):
-        """Test POST when movie has no availability data"""
-        # Create a movie with no availability entries
         movie_no_avail, _ = Movie.objects.get_or_create(
             tconst="tt9999998",
             defaults={"primary_title": "Test Movie No Availability", "avg_rating": 8.0}
@@ -436,6 +383,420 @@ class UserMoviePostAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["movie"]["tconst"], "tt9999998")
-        # Availability should be an empty list
         self.assertIn("availability", response.data)
         self.assertEqual(response.data["availability"], [])
+
+
+class UserMoviePatchAPITests(APITestCase):
+    """Tests for PATCH /api/user-movies/<id>/ endpoint"""
+
+    def setUp(self):
+        self.test_user_id = uuid.UUID(os.getenv("TEST_USER"))
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        self.user1, _ = User.objects.get_or_create(
+            id=47,
+            defaults={
+                'email': 'testpatch@example.com',
+                'username': 'testpatchuser',
+                'is_active': True
+            }
+        )
+
+        self.patcher = patch('services.user_movies_service._get_supabase_user_uuid')
+        self.mock_get_uuid = self.patcher.start()
+        self.mock_get_uuid.return_value = str(self.test_user_id)
+
+        self.movie_on_watchlist, _ = Movie.objects.get_or_create(
+            tconst="tt1111111", defaults={"primary_title": "Watchlist Movie", "avg_rating": 8.5}
+        )
+        self.movie_already_watched, _ = Movie.objects.get_or_create(
+            tconst="tt2222222", defaults={"primary_title": "Already Watched Movie", "avg_rating": 9.0}
+        )
+
+        self.platform1, _ = Platform.objects.get_or_create(
+            id=1, defaults={"platform_slug": "netflix", "platform_name": "Netflix"}
+        )
+        self.platform2, _ = Platform.objects.get_or_create(
+            id=2, defaults={"platform_slug": "hbo", "platform_name": "HBO Max"}
+        )
+
+        UserPlatform.objects.get_or_create(
+            user_id=self.test_user_id, platform_id=self.platform1.id
+        )
+        UserPlatform.objects.get_or_create(
+            user_id=self.test_user_id, platform_id=self.platform2.id
+        )
+
+        MovieAvailability.objects.get_or_create(
+            tconst=self.movie_on_watchlist,
+            platform=self.platform1,
+            defaults={
+                "is_available": True,
+                "last_checked": "2023-10-01T10:00:00Z",
+                "source": "test",
+            },
+        )
+        MovieAvailability.objects.get_or_create(
+            tconst=self.movie_already_watched,
+            platform=self.platform1,
+            defaults={
+                "is_available": False,
+                "last_checked": "2023-10-01T10:00:00Z",
+                "source": "test",
+            },
+        )
+
+        # FIX: Use timezone.now() for datetime objects instead of strings
+        self.user_movie_watchlist = UserMovie.objects.create(
+            user_id=self.test_user_id,
+            tconst=self.movie_on_watchlist,
+            watchlisted_at=timezone.now(),
+            watchlist_deleted_at=None,
+            watched_at=None,
+        )
+
+        # FIX: Use timezone.now() for datetime objects instead of strings
+        self.user_movie_watched = UserMovie.objects.create(
+            user_id=self.test_user_id,
+            tconst=self.movie_already_watched,
+            watchlisted_at=timezone.now(),
+            watchlist_deleted_at=None,
+            watched_at=timezone.now(),
+        )
+
+        self.url = reverse("usermovie-list")
+
+    def tearDown(self):
+        self.patcher.stop()
+
+    def test_patch_authentication_required(self):
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_patch_idor_protection_not_own_entry(self):
+        self.client.force_authenticate(user=self.user1)
+        non_existent_id = 99999999
+
+        patch_url = f"{self.url}{non_existent_id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("detail", response.data)
+
+    def test_patch_non_existent_entry(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}9999999/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("detail", response.data)
+
+    def test_patch_mark_as_watched_success(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("id", response.data)
+        self.assertIn("movie", response.data)
+        self.assertIn("availability", response.data)
+        self.assertIn("watchlisted_at", response.data)
+        self.assertIn("watched_at", response.data)
+
+        self.assertEqual(response.data["movie"]["tconst"], self.movie_on_watchlist.tconst)
+        self.assertIsNotNone(response.data["watched_at"])
+
+        updated_movie = UserMovie.objects.get(id=self.user_movie_watchlist.id)
+        self.assertIsNotNone(updated_movie.watched_at)
+
+    def test_patch_mark_as_watched_already_watched(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watched.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", response.data)
+        self.assertIn("already marked as watched", str(response.data["detail"]))
+
+    def test_patch_mark_as_watched_soft_deleted_movie(self):
+        soft_deleted_movie, _ = Movie.objects.get_or_create(
+            tconst="tt4444444", defaults={"primary_title": "Soft Deleted Movie", "avg_rating": 8.0}
+        )
+        MovieAvailability.objects.get_or_create(
+            tconst=soft_deleted_movie,
+            platform=self.platform1,
+            defaults={
+                "is_available": True,
+                "last_checked": "2023-10-01T10:00:00Z",
+                "source": "test",
+            },
+        )
+        user_movie_deleted = UserMovie.objects.create(
+            user_id=self.test_user_id,
+            tconst=soft_deleted_movie,
+            watchlisted_at=timezone.now(),
+            watchlist_deleted_at=timezone.now(),
+            watched_at=None,
+        )
+
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{user_movie_deleted.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", response.data)
+        self.assertIn("must be on watchlist", str(response.data["detail"]))
+
+    def test_patch_restore_to_watchlist_success(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watched.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "restore_to_watchlist"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["watched_at"])
+        self.assertIsNotNone(response.data["watchlisted_at"])
+
+        self.assertEqual(response.data["movie"]["tconst"], self.movie_already_watched.tconst)
+
+        updated_movie = UserMovie.objects.get(id=self.user_movie_watched.id)
+        self.assertIsNone(updated_movie.watched_at)
+        self.assertIsNotNone(updated_movie.watchlisted_at)
+
+    def test_patch_restore_to_watchlist_not_watched(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "restore_to_watchlist"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", response.data)
+        self.assertIn("not marked as watched", str(response.data["detail"]))
+
+    def test_patch_missing_action_field(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.patch(patch_url, {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("action", response.data)
+
+    def test_patch_invalid_action_value(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        invalid_actions = [
+            "invalid_action",
+            "mark_watched",
+            "restore",
+            "Mark_As_Watched",
+            "",
+        ]
+
+        for invalid_action in invalid_actions:
+            response = self.client.patch(
+                patch_url,
+                {"action": invalid_action},
+                format="json"
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertIn("action", response.data)
+
+    def test_patch_empty_request_body(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.patch(patch_url, {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patch_response_structure_mark_as_watched(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        data = response.data
+        self.assertIn("id", data)
+        self.assertIn("movie", data)
+        self.assertIn("availability", data)
+        self.assertIn("watchlisted_at", data)
+        self.assertIn("watched_at", data)
+
+        movie = data["movie"]
+        self.assertIn("tconst", movie)
+        self.assertIn("primary_title", movie)
+        self.assertIn("start_year", movie)
+        self.assertIn("genres", movie)
+        self.assertIn("avg_rating", movie)
+        self.assertIn("poster_path", movie)
+
+        self.assertIsInstance(data["availability"], list)
+        if data["availability"]:
+            avail = data["availability"][0]
+            self.assertIn("platform_id", avail)
+            self.assertIn("platform_name", avail)
+            self.assertIn("is_available", avail)
+
+    def test_patch_response_structure_restore_to_watchlist(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watched.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "restore_to_watchlist"},
+            format="json"
+        )
+
+        self.assertIsNone(response.data["watched_at"])
+        self.assertIsNotNone(response.data["watchlisted_at"])
+
+    def test_patch_mark_as_watched_timestamp_is_recent(self):
+        before_patch = timezone.now()
+
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        after_patch = timezone.now()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        watched_at_str = response.data["watched_at"]
+        from dateutil import parser
+        watched_at = parser.isoparse(watched_at_str.replace("Z", "+00:00"))
+
+        self.assertGreaterEqual(watched_at, before_patch)
+        self.assertLessEqual(watched_at, after_patch)
+
+    def test_patch_preserves_other_fields(self):
+        original_movie = UserMovie.objects.get(id=self.user_movie_watchlist.id)
+        original_added_from_ai = original_movie.added_from_ai_suggestion
+
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        updated_movie = UserMovie.objects.get(id=self.user_movie_watchlist.id)
+        self.assertIsNone(updated_movie.watchlist_deleted_at)
+        self.assertEqual(updated_movie.added_from_ai_suggestion, original_added_from_ai)
+
+    def test_patch_availability_filtered_by_user_platforms(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        availability = response.data["availability"]
+        platform_ids = [a["platform_id"] for a in availability]
+
+        for platform_id in platform_ids:
+            self.assertIn(platform_id, [self.platform1.id, self.platform2.id])
+
+    def test_patch_sequence_mark_and_restore(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response1 = self.client.patch(
+            patch_url,
+            {"action": "mark_as_watched"},
+            format="json"
+        )
+        self.assertEqual(response1.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response1.data["watched_at"])
+
+        movie_after_mark = UserMovie.objects.get(id=self.user_movie_watchlist.id)
+        self.assertIsNotNone(movie_after_mark.watched_at)
+
+        response2 = self.client.patch(
+            patch_url,
+            {"action": "restore_to_watchlist"},
+            format="json"
+        )
+        self.assertEqual(response2.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response2.data["watched_at"])
+
+        movie_after_restore = UserMovie.objects.get(id=self.user_movie_watchlist.id)
+        self.assertIsNone(movie_after_restore.watched_at)
+
+    def test_patch_idempotent_sequence(self):
+        self.client.force_authenticate(user=self.user1)
+        patch_url = f"{self.url}{self.user_movie_watched.id}/"
+
+        response1 = self.client.patch(
+            patch_url,
+            {"action": "restore_to_watchlist"},
+            format="json"
+        )
+        self.assertEqual(response1.status_code, status.HTTP_200_OK)
+
+        response2 = self.client.patch(
+            patch_url,
+            {"action": "restore_to_watchlist"},
+            format="json"
+        )
+        self.assertEqual(response2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("not marked as watched", str(response2.data["detail"])) 
