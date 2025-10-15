@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
-from movies.models import Movie, Platform, UserMovie, MovieAvailability, UserPlatform
+from movies.models import Movie, Platform, UserMovie, MovieAvailability, UserPlatform  # type: ignore
 from dotenv import load_dotenv
 import os
 from django.utils import timezone
@@ -800,3 +800,105 @@ class UserMoviePatchAPITests(APITestCase):
         )
         self.assertEqual(response2.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("not marked as watched", str(response2.data["detail"])) 
+
+    # ============================================================================
+    # DELETE Endpoint Tests - Soft Delete Tests
+    # ============================================================================
+
+    def test_delete_success_returns_204_no_content(self):
+        """Test that DELETE /api/user-movies/<id>/ returns 204 No Content on success."""
+        self.client.force_authenticate(user=self.user1)
+        delete_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        # Verify movie exists before deletion
+        user_movie_before = UserMovie.objects.get(id=self.user_movie_watchlist.id)
+        self.assertIsNone(user_movie_before.watchlist_deleted_at)
+        self.assertIsNotNone(user_movie_before.watchlisted_at)
+
+        # Delete the movie
+        response = self.client.delete(delete_url)
+
+        # Verify 204 No Content response (no body)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertIsNone(response.data)
+
+        # Verify soft-delete in database
+        user_movie_after = UserMovie.objects.get(id=self.user_movie_watchlist.id)
+        self.assertIsNotNone(user_movie_after.watchlist_deleted_at)
+        self.assertIsNotNone(user_movie_after.watchlisted_at)
+
+    def test_delete_nonexistent_returns_404(self):
+        """Test that DELETE nonexistent ID returns 404 Not Found."""
+        self.client.force_authenticate(user=self.user1)
+        delete_url = f"{self.url}99999/"
+
+        response = self.client.delete(delete_url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("not found", str(response.data["detail"]).lower())
+
+    def test_delete_already_deleted_returns_404(self):
+        """Test that second DELETE returns 404 (pseudo-idempotency)."""
+        self.client.force_authenticate(user=self.user1)
+        delete_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        # First DELETE
+        response1 = self.client.delete(delete_url)
+        self.assertEqual(response1.status_code, status.HTTP_204_NO_CONTENT)
+
+        # Second DELETE
+        response2 = self.client.delete(delete_url)
+        self.assertEqual(response2.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_delete_without_authentication_returns_401(self):
+        """Test that DELETE without authentication returns 401 Unauthorized."""
+        delete_url = f"{self.url}{self.user_movie_watchlist.id}/"
+
+        response = self.client.delete(delete_url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_delete_other_user_movie_returns_404(self):
+        """Test IDOR protection: user cannot delete another user's movie."""
+        # Create a second user in Django auth
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        user2_django, _ = User.objects.get_or_create(
+            id=48,
+            defaults={
+                'email': 'testuser2@example.com',
+                'username': 'testuser2',
+                'is_active': True
+            }
+        )
+        
+        # Create a user in auth.users table for foreign key constraint
+        from django.db import connection
+        user2_uuid = uuid.uuid4()
+        
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO auth.users (id, email, encrypted_password, created_at, updated_at, email_confirmed_at)
+                VALUES (%s, %s, %s, NOW(), NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
+            """, [user2_uuid, 'testuser2@example.com', 'dummy_password_hash'])
+        
+        # Create movie for different user
+        user2_movie = UserMovie.objects.create(
+            user_id=user2_uuid,
+            tconst=self.movie_on_watchlist,
+            watchlisted_at=timezone.now()
+        )
+
+        # Try to delete as user1
+        self.client.force_authenticate(user=self.user1)
+        delete_url = f"{self.url}{user2_movie.id}/"
+
+        response = self.client.delete(delete_url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Verify NOT deleted
+        user2_movie_after = UserMovie.objects.get(id=user2_movie.id)
+        self.assertIsNone(user2_movie_after.watchlist_deleted_at) 

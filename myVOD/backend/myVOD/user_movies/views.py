@@ -9,7 +9,12 @@ from .serializers import (
     AddUserMovieCommandSerializer,
     UpdateUserMovieCommandSerializer
 )
-from services.user_movies_service import build_user_movies_queryset, add_movie_to_watchlist, update_user_movie
+from services.user_movies_service import (
+    build_user_movies_queryset,
+    add_movie_to_watchlist,
+    update_user_movie,
+    delete_user_movie_soft
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +42,8 @@ class UserMovieViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None  # Disable pagination for this endpoint (MVP)
 
-    # Disable PUT and DELETE methods (only allow GET, POST, PATCH)
-    http_method_names = ['get', 'post', 'patch', 'head', 'options']
+    # Enable GET, POST, PATCH, DELETE methods
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         # Fallback queryset; real queryset is constructed in list() after validation
@@ -254,6 +259,71 @@ class UserMovieViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.error(
                 f"Unexpected error while updating user-movie {pk} for user {request.user.id}: {str(e)}",
+                exc_info=True
+            )
+            return Response(
+                {"detail": "An unexpected error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def destroy(self, request, pk=None, *args, **kwargs):
+        """
+        Soft-delete a movie from user's watchlist (DELETE).
+
+        Implements business logic:
+        - Performs soft-delete by setting watchlist_deleted_at to current timestamp
+        - Ensures user can only delete their own entries (IDOR protection)
+        - Returns 204 No Content on success
+        - Returns 404 if entry not found, belongs to another user, or already soft-deleted
+
+        Returns:
+            204: No Content - Soft-delete successful, no response body
+            401: Unauthorized - Not authenticated
+            404: Not Found - Entry not found, doesn't belong to user, or already deleted
+            500: Internal Server Error - Unexpected error
+        """
+        try:
+            # Use service layer for business logic
+            delete_user_movie_soft(
+                user=request.user,
+                user_movie_id=pk
+            )
+
+            # Return 204 No Content (no response body)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        except UserMovie.DoesNotExist:
+            logger.info(
+                f"User movie not found for deletion by user {request.user.id}: {pk}"
+            )
+            return Response(
+                {"detail": f"User movie with id {pk} not found or does not belong to authenticated user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        except ValueError as e:
+            # Business rule violation (already soft-deleted or other precondition)
+            logger.info(
+                f"Business logic violation for user {request.user.id} deleting user-movie {pk}: {str(e)}"
+            )
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        except DatabaseError as e:
+            logger.error(
+                f"Database error while deleting user-movie {pk} for user {request.user.id}: {str(e)}",
+                exc_info=True
+            )
+            return Response(
+                {"detail": "A database error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Unexpected error while deleting user-movie {pk} for user {request.user.id}: {str(e)}",
                 exc_info=True
             )
             return Response(

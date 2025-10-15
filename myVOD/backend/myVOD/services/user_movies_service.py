@@ -1,7 +1,8 @@
 from django.db.models import Prefetch, Exists, OuterRef
 from django.db import transaction
 from django.utils import timezone
-from movies.models import UserMovie, MovieAvailability, UserPlatform, Movie
+from movies.models import UserMovie, MovieAvailability, UserPlatform, Movie  # type: ignore
+import uuid
 
 
 def _get_supabase_user_uuid(email: str):
@@ -39,6 +40,36 @@ def _get_user_platform_ids(user_id):
     )
 
 
+def _is_uuid_like(value) -> bool:
+    """Check if value can be interpreted as a UUID string."""
+    try:
+        uuid.UUID(str(value))
+        return True
+    except Exception:
+        return False
+
+
+def _resolve_user_uuid(user):
+    """Resolve the canonical UUID for the given user.
+
+    Strategy:
+    - If user.id looks like a UUID, trust and return it (works for tests and direct UUID usage)
+    - Else, fallback to Supabase lookup by email (works for Django auth PKs)
+    """
+    # Prefer direct UUID if available
+    if hasattr(user, "id") and _is_uuid_like(user.id):
+        return str(uuid.UUID(str(user.id)))
+
+    # Fallback to Supabase auth.users lookup by email
+    if hasattr(user, "email"):
+        supabase_uuid = _get_supabase_user_uuid(user.email)
+        if supabase_uuid:
+            return supabase_uuid
+        raise Exception(f"Supabase user not found for email: {user.email}")
+
+    raise Exception("Unable to resolve user UUID: user has neither UUID-like id nor email")
+
+
 def build_user_movies_queryset(
     *,
     user,
@@ -55,7 +86,9 @@ def build_user_movies_queryset(
         is_available: Optional boolean to filter by availability across user's platforms.
     """
 
-    platform_ids = _get_user_platform_ids(user.id)
+    # Resolve canonical user UUID (handles both direct UUID and Django auth PK flows)
+    supabase_user_uuid = _resolve_user_uuid(user)
+    platform_ids = _get_user_platform_ids(supabase_user_uuid)
 
     availability_prefetch = Prefetch(
         'tconst__availability_entries',
@@ -64,7 +97,7 @@ def build_user_movies_queryset(
     )
 
     queryset = (
-        UserMovie.objects.filter(user_id=user.id)
+        UserMovie.objects.filter(user_id=supabase_user_uuid, watchlist_deleted_at__isnull=True)
         .select_related('tconst')
         .prefetch_related(availability_prefetch)
     )
@@ -72,7 +105,6 @@ def build_user_movies_queryset(
     if status_param == 'watchlist':
         queryset = queryset.filter(
             watchlisted_at__isnull=False,
-            watchlist_deleted_at__isnull=True,
         )
     elif status_param == 'watched':
         queryset = queryset.filter(watched_at__isnull=False)
@@ -130,10 +162,8 @@ def add_movie_to_watchlist(*, user, tconst: str):
         ValueError: If the movie is already on user's active watchlist
         Exception: If Supabase user not found
     """
-    # Get Supabase UUID for the user
-    supabase_user_uuid = _get_supabase_user_uuid(user.email)
-    if not supabase_user_uuid:
-        raise Exception(f"Supabase user not found for email: {user.email}")
+    # Resolve canonical user UUID for the user
+    supabase_user_uuid = _resolve_user_uuid(user)
 
     # Guard clause: Validate movie exists
     if not Movie.objects.filter(tconst=tconst).exists():
@@ -225,10 +255,8 @@ def update_user_movie(*, user, user_movie_id: int, action: str):
         ValueError: If business logic preconditions are violated
         Exception: If Supabase user not found
     """
-    # Get Supabase UUID for the user
-    supabase_user_uuid = _get_supabase_user_uuid(user.email)
-    if not supabase_user_uuid:
-        raise Exception(f"Supabase user not found for email: {user.email}")
+    # Resolve canonical user UUID for the user
+    supabase_user_uuid = _resolve_user_uuid(user)
 
     # Guard clause: Fetch the user_movie and ensure it belongs to authenticated user
     try:
@@ -237,6 +265,10 @@ def update_user_movie(*, user, user_movie_id: int, action: str):
         raise UserMovie.DoesNotExist(
             f"UserMovie with id {user_movie_id} not found or does not belong to user"
         )
+
+    # Note: We don't check soft-deleted status here because business logic
+    # for each action should determine the appropriate error message
+    # (e.g., "must be on watchlist" for mark_as_watched)
 
     # Handle mark_as_watched action
     if action == 'mark_as_watched':
@@ -280,4 +312,51 @@ def update_user_movie(*, user, user_movie_id: int, action: str):
         .first()
     )
 
+    return user_movie
+
+
+@transaction.atomic
+def delete_user_movie_soft(*, user, user_movie_id: int):
+    """Soft-deletes a user-movie entry.
+
+    Business Logic:
+    - Authorization: Ensures the user_movie belongs to the authenticated user
+    - Sets watchlist_deleted_at to current timestamp
+    - Returns the updated UserMovie with full data (movie, availability)
+
+    Args:
+        user: The authenticated user object with `email` attribute
+        user_movie_id: The ID of the user_movie entry to delete
+
+    Returns:
+        UserMovie: The updated user_movie instance with:
+            - tconst (Movie) prefetched via select_related
+            - availability_filtered prefetched for user's platforms
+
+    Raises:
+        UserMovie.DoesNotExist: If user_movie not found or doesn't belong to user
+        Exception: If Supabase user not found
+    """
+    # Resolve canonical user UUID for the user
+    supabase_user_uuid = _resolve_user_uuid(user)
+
+    # Guard clause: Fetch the user_movie and ensure it belongs to authenticated user
+    try:
+        user_movie = UserMovie.objects.get(id=user_movie_id, user_id=supabase_user_uuid)
+    except UserMovie.DoesNotExist:
+        raise UserMovie.DoesNotExist(
+            f"UserMovie with id {user_movie_id} not found or does not belong to user"
+        )
+
+    # Guard clause: Check if already soft-deleted
+    if user_movie.watchlist_deleted_at is not None:
+        raise UserMovie.DoesNotExist(
+            f"UserMovie with id {user_movie_id} not found or does not belong to user"
+        )
+
+    # Soft-delete the user_movie
+    user_movie.watchlist_deleted_at = timezone.now()
+    user_movie.save(update_fields=['watchlist_deleted_at'])
+
+    # No response body needed for DELETE 204 in view → avoid extra re-fetch
     return user_movie
