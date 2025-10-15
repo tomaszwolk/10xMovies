@@ -17,8 +17,42 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework_simplejwt.views import (
+    TokenRefreshView,
+    TokenVerifyView,
+)
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
+from . import views
 
 urlpatterns = [
+    # Admin panel
     path("admin/", admin.site.urls),
+
+    # Root redirect to API documentation
+    path("", views.root_redirect, name="root"),
+
+    # API Documentation (drf-spectacular)
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+
+    # JWT Authentication (uses email instead of username)
+    path("api/token/", views.EmailTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
+
+    # User Movies (Watchlist & Watched History)
     path("api/user-movies/", include("user_movies.urls")),
+
+    # TODO: Implement these endpoints
+    # path("api/register/", views.RegisterView.as_view(), name="register"),
+    # path("api/me/", views.UserProfileView.as_view(), name="user-profile"),
+    # path("api/platforms/", views.PlatformListView.as_view(), name="platforms"),
+    # path("api/movies/", views.MovieSearchView.as_view(), name="movies"),
+    # path("api/suggestions/", views.AISuggestionsView.as_view(), name="suggestions"),
 ]
+

@@ -75,11 +75,12 @@ Funkcjonalności rejestracji:
 
 Funkcjonalności logowania:
 - Logowanie przez email i hasło
-- Sesje użytkownika
-- Wylogowanie
+- Zarządzanie tokenami JWT (access i refresh tokens)
+- Wylogowanie (usunięcie tokenów po stronie klienta)
 
 Bezpieczeństwo:
 - Bcrypt z minimum 10 rounds dla haszowania
+- JSON Web Tokens (JWT) dla autentykacji API
 - Ochrona przed atakami brute-force
 - Brak funkcji "zapomniane hasło" w MVP (v1.1)
 
@@ -393,6 +394,7 @@ Funkcjonalności odłożone na przyszłość:
 
 Techniczne:
 - Stack technologiczny zostanie określony w osobnym dokumencie
+- Autentykacja oparta o JSON Web Tokens (JWT) - stateless, bez tradycyjnych sesji
 - Dostęp do Watchmode.com API (wymaga rejestracji i API key)
 - Dostęp do TMDB API (darmowe dla non-commercial)
 - Dostęp do Google Gemini-flash-lite (wymaga Google Cloud account)
@@ -478,7 +480,8 @@ Kryteria akceptacji:
 - System porównuje podane hasło z zahaszowanym hasłem w bazie (bcrypt)
 - Komunikat błędu "Nieprawidłowy email lub hasło" przy błędnych danych
 - Po prawidłowym logowaniu użytkownik jest przekierowany do swojej watchlisty
-- Sesja użytkownika jest tworzona i zapisywana
+- Tokeny JWT (access i refresh) są generowane i zwracane klientowi
+- Klient zapisuje tokeny w local storage lub bezpiecznym storage
 - Data ostatniego logowania jest aktualizowana w bazie danych
 
 US-003: Wylogowanie użytkownika
@@ -486,7 +489,8 @@ Jako zalogowany użytkownik chcę wylogować się z aplikacji, aby zabezpieczyć
 
 Kryteria akceptacji:
 - Przycisk "Wyloguj" jest widoczny w interfejsie (menu/header)
-- Po kliknięciu sesja użytkownika jest niszczona
+- Po kliknięciu tokeny JWT są usuwane z local storage po stronie klienta
+- Refresh token jest dodawany do blacklisty (opcjonalnie, zależnie od konfiguracji)
 - Użytkownik jest przekierowany do strony logowania
 - Próba dostępu do chronionej strony po wylogowaniu przekierowuje do logowania
 
@@ -896,7 +900,8 @@ Kryteria akceptacji:
   - Historia sugestii AI
   - Cache sugestii
   - Logi analytics dla tego użytkownika
-- Sesja jest niszczona
+- Tokeny JWT są unieważnione (dodane do blacklisty)
+- Tokeny są usuwane z local storage po stronie klienta
 - Użytkownik jest przekierowany do strony głównej z komunikatem "Konto zostało usunięte"
 
 US-037: Soft delete filmu - zachowanie dla analytics
@@ -967,13 +972,15 @@ Kryteria akceptacji:
 - Użytkownik pozostaje na tej samej stronie
 - Opcja: "Przejdź do watchlisty" w komunikacie
 
-US-043: Sesja użytkownika wygasła
-Jako zalogowany użytkownik po wygaśnięciu sesji chcę wykonać akcję, aby zostać bezpiecznie przekierowanym do logowania.
+US-043: Token JWT wygasł
+Jako zalogowany użytkownik po wygaśnięciu access tokena chcę wykonać akcję, aby zostać bezpiecznie przekierowanym do logowania lub automatycznie odświeżyć token.
 
 Kryteria akceptacji:
-- Po wygaśnięciu sesji (timeout lub logout w innej zakładce) próba akcji zwraca błąd autoryzacji
-- Użytkownik jest automatycznie przekierowany do strony logowania
-- Komunikat: "Twoja sesja wygasła. Zaloguj się ponownie."
+- Po wygaśnięciu access tokena próba akcji zwraca błąd 401 Unauthorized
+- System próbuje automatycznie odświeżyć token używając refresh tokena
+- Jeśli refresh token jest ważny, nowy access token jest otrzymany i akcja jest powtarzana
+- Jeśli refresh token wygasł lub jest nieważny, użytkownik jest przekierowany do logowania
+- Komunikat: "Twoja sesja wygasła. Zaloguj się ponownie." (tylko przy przekierowaniu do logowania)
 - Po zalogowaniu użytkownik wraca do poprzedniej strony (jeśli możliwe)
 - Brak utraty danych z formularzy (jeśli możliwe)
 

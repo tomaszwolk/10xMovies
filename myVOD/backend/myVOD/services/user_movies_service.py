@@ -1,4 +1,4 @@
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Exists, OuterRef
 from movies.models import UserMovie, MovieAvailability, UserPlatform
 
 
@@ -28,7 +28,7 @@ def build_user_movies_queryset(
 
     availability_prefetch = Prefetch(
         'tconst__availability_entries',
-        queryset=MovieAvailability.objects.filter(platform_id__in=platform_ids),
+        queryset=MovieAvailability.objects.filter(platform_id__in=platform_ids).select_related('platform'),
         to_attr='availability_filtered'
     )
 
@@ -47,26 +47,28 @@ def build_user_movies_queryset(
         queryset = queryset.filter(watched_at__isnull=False)
 
     if is_available is True:
-        available_tconsts = MovieAvailability.objects.filter(
+        # Use EXISTS subquery for better performance (no materialized list)
+        available_subquery = MovieAvailability.objects.filter(
+            tconst=OuterRef('tconst'),
             platform_id__in=platform_ids,
             is_available=True,
-        ).values_list('tconst', flat=True)
-        queryset = queryset.filter(tconst__in=available_tconsts)
+        )
+        queryset = queryset.filter(Exists(available_subquery))
     elif is_available is False:
-        # Movies that have at least one FALSE entry and NO TRUE entries on user's platforms
-        true_tconsts = MovieAvailability.objects.filter(
+        # Movies with at least one FALSE and NO TRUE entries on user's platforms
+        has_true = MovieAvailability.objects.filter(
+            tconst=OuterRef('tconst'),
             platform_id__in=platform_ids,
             is_available=True,
-        ).values_list('tconst', flat=True)
-        false_tconsts = MovieAvailability.objects.filter(
+        )
+        has_false = MovieAvailability.objects.filter(
+            tconst=OuterRef('tconst'),
             platform_id__in=platform_ids,
             is_available=False,
-        ).values_list('tconst', flat=True)
-        queryset = queryset.filter(tconst__in=false_tconsts).exclude(tconst__in=true_tconsts)
+        )
+        queryset = queryset.filter(Exists(has_false)).exclude(Exists(has_true))
 
     if ordering_param in ['-watchlisted_at', '-tconst__avg_rating']:
         queryset = queryset.order_by(ordering_param)
 
     return queryset
-
-

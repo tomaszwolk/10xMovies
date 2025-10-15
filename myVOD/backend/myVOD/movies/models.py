@@ -1,5 +1,4 @@
 from django.db import models
-import uuid
 
 # Uwaga: Modele te zostały wygenerowane ręcznie na podstawie schematu SQL.
 # Klucze obce wskazujące na tabelę `auth.users` z Supabase są zdefiniowane jako
@@ -24,7 +23,7 @@ class Movie(models.Model):
     primary_title = models.TextField()
     original_title = models.TextField(blank=True, null=True)
     start_year = models.SmallIntegerField(blank=True, null=True)
-    genres = models.JSONField(blank=True, null=True) # Używamy JSONField dla text[]
+    genres = models.JSONField(blank=True, null=True)  # Używamy JSONField dla text[]
     avg_rating = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
     num_votes = models.IntegerField(blank=True, null=True)
     poster_path = models.TextField(blank=True, null=True)

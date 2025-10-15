@@ -125,7 +125,7 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
 #### `GET /api/user-movies/`
 
 -   **Description**: Retrieves the user's watchlist or watched history.
--   **Authentication**: Required (returns 403 when unauthenticated).
+-   **Authentication**: Required (returns 401 when unauthenticated).
 -   **Query Parameters**:
     -   `status` (string, required): `watchlist` or `watched`.
     -   `ordering` (string, optional): Allow-listed values: `-watchlisted_at`, `-tconst__avg_rating`.
@@ -152,7 +152,7 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
     ```
 -   **Error Responses**:
     - `400 Bad Request`: Missing/invalid `status`; invalid `ordering`; invalid `is_available` boolean.
-    - `403 Forbidden`: Missing or invalid authentication.
+    - `401 Unauthorized`: Missing or invalid authentication.
 
 #### `POST /api/user-movies/`
 
@@ -190,7 +190,7 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
         - Missing `tconst` field in request body
         - Movie with given `tconst` does not exist in database
         - Invalid `tconst` format
-    -   `403 Forbidden`: Not authenticated.
+    -   `401 Unauthorized`: Not authenticated.
     -   `409 Conflict`: Movie is already on the watchlist.
 
 #### `PATCH /api/user-movies/<id>/`

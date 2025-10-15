@@ -172,3 +172,31 @@ Po potwierdzeniu, że wymagania są spełnione, przejdź do następnego kroku.
 3. Zatwierdź migracje w promptcie CLI.
 
 **Wyjaśnienie**: `supabase db push` wypchnie pliki z katalogu `myVOD/supabase/migrations/` do zdalnej bazy. Używamy tego, gdy schema jest zarządzana poza Django ORM (unmanaged models).
+
+---
+
+## Część 3: Uwaga o autentykacji i autoryzacji
+
+**Ważne**: Ta instrukcja konfiguruje **tylko połączenie z bazą danych Supabase**. 
+
+### Autentykacja użytkowników
+
+**Autentykacja** w projekcie MyVOD jest obsługiwana przez:
+- **Backend (Django)**: `djangorestframework-simplejwt` - JSON Web Tokens (JWT)
+- **Frontend (React)**: Axios z nagłówkami `Authorization: Bearer <token>`
+
+**NIE używamy** Supabase Auth. Supabase służy jedynie jako hostowana baza PostgreSQL. Wszystkie operacje autentykacji są obsługiwane przez Django REST Framework.
+
+### Autoryzacja (Row Level Security)
+
+**Ważne**: RLS policies oparte na `auth.uid()` **NIE DZIAŁAJĄ** z Django Auth + JWT!
+
+**Dlaczego:**
+- Django łączy się jako jeden użytkownik aplikacji (`postgres.[project-ref]`), nie jako end-users
+- `auth.uid()` zwraca NULL (brak Supabase Auth session)
+- Django zarządza autoryzacją w kodzie Pythona (ORM filters)
+
+**Co jest skonfigurowane:**
+- Tabele user-owned (`user_movie`, `user_platform`, etc.): **RLS wyłączone** - Django filtruje przez `user_id`
+- Tabele globalne (`movie`, `platform`): **RLS włączone** (read-only) - zabezpieczenie przed błędami
+- Migracja `20251015120000_disable_rls_for_django_auth.sql` usuwa niekompatybilne policies

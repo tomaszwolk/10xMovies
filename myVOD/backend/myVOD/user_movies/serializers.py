@@ -3,6 +3,9 @@ from movies.models import Movie, MovieAvailability, UserMovie
 
 
 class MovieSerializer(serializers.ModelSerializer):
+    # avg_rating as string per API spec (not number)
+    avg_rating = serializers.CharField(allow_null=True, read_only=True)
+
     class Meta:
         model = Movie
         fields = [
@@ -37,11 +40,11 @@ class UserMovieQueryParamsSerializer(serializers.Serializer):
 
     - status: required, one of ['watchlist', 'watched']
     - ordering: optional, allow-listed fields
-    - is_available: optional boolean
+    - is_available: optional boolean (None if not provided)
     """
 
     status = serializers.ChoiceField(choices=["watchlist", "watched"], required=True)
     ordering = serializers.ChoiceField(
         choices=["-watchlisted_at", "-tconst__avg_rating"], required=False
     )
-    is_available = serializers.BooleanField(required=False)
+    is_available = serializers.BooleanField(required=False, allow_null=True, default=None)

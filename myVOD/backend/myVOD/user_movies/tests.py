@@ -82,7 +82,8 @@ class UserMovieAPITests(APITestCase):
 
     def test_authentication_required(self):
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        # 401 is correct for missing authentication (not 403)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_get_watchlist(self):
         self.client.force_authenticate(user=self.user1)
