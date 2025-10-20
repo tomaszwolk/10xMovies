@@ -90,7 +90,7 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
 #### `GET /api/platforms/`
 
 -   **Description**: Retrieves a list of all available VOD platforms.
--   **Authentication**: Required.
+-   **Authentication**: None (public endpoint).
 -   **Success Response** (200 OK):
     ```json
     [
@@ -103,7 +103,7 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
 #### `GET /api/movies/`
 
 -   **Description**: Searches for movies.
--   **Authentication**: Required.
+-   **Authentication**: None (public endpoint).
 -   **Query Parameters**:
     -   `search` (string): The search query for the movie title (e.g., `?search=interstellar`).
 -   **Success Response** (200 OK):
@@ -225,11 +225,11 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
 
 -   **Description**: Generates or retrieves cached AI movie suggestions for the user.
 -   **Authentication**: Required.
--   **Rate Limiting**: 1 request per 24 hours per user.
+-   **Rate Limiting**: 1 request per calendar day (based on server date). User can receive new suggestions once per day, regardless of the exact time of previous request.
 -   **Success Response** (200 OK):
     ```json
     {
-      "expires_at": "2025-10-13T12:00:00Z",
+      "expires_at": "2025-10-13T23:59:59Z",
       "suggestions": [
         {
           "tconst": "tt0133093",
@@ -244,7 +244,7 @@ All endpoints requiring authentication must include the `Authorization: Bearer <
     }
     ```
 -   **Error Responses**:
-    -   `429 Too Many Requests`: User has exceeded the 24-hour limit.
+    -   `429 Too Many Requests`: User has already received suggestions today.
     -   `404 Not Found`: User has no movies on their watchlist or watched history to base suggestions on.
 
 ## 4. Validation and Business Logic

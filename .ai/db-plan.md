@@ -64,8 +64,8 @@ Stores movie information imported from IMDb and enriched with other sources.
 | `num_votes` | `integer` | | Number of votes for the rating. |
 | `poster_path` | `text` | | URL path to the movie poster (from TMDB). |
 | `poster_last_checked` | `timestamptz` | | When the poster path was last checked/updated. |
-| `tmdb_id` | `bigint` | **Unique** (partial) | The Movie Database (TMDB) ID. |
-| `watchmode_id` | `bigint` | **Unique** (partial) | Watchmode.com ID. |
+| `tmdb_id` | `bigint` | Indexed (partial, non-unique) | The Movie Database (TMDB) ID. |
+| `watchmode_id` | `bigint` | Indexed (partial, non-unique) | Watchmode.com ID. |
 | `created_at` | `timestamptz` | Not Null, `default now()` | Timestamp of record creation. |
 | `updated_at` | `timestamptz` | Not Null, `default now()` | Timestamp of last record update. |
 
@@ -110,10 +110,12 @@ Caches AI-generated movie suggestions for users.
 |---|---|---|---|
 | `id` | `bigint` | **Primary Key**, Identity | Unique identifier for the suggestion batch. |
 | `user_id` | `uuid` | **Foreign Key** -> `auth.users(id)` ON DELETE CASCADE, Not Null | The user who received the suggestions. |
-| `generated_at` | `timestamptz` | Not Null, `default now()` | Timestamp when the suggestions were generated. |
-| `expires_at` | `timestamptz` | Not Null | Expiration time for the cached suggestions (24h). |
+| `generated_at` | `timestamptz` | Not Null, `default now()` | Timestamp when the suggestions were generated. Used for calendar-day rate limiting. |
+| `expires_at` | `timestamptz` | Not Null | Expiration time for the cached suggestions (set to end of calendar day: 23:59:59). |
 | `prompt` | `text` | | The user prompt that generated the suggestions. |
 | `response` | `jsonb` | | The full JSON response from the AI model. |
+
+**Rate Limiting**: Suggestions are limited to once per calendar day (server timezone). Rate limit is enforced by checking if the date portion of `generated_at` matches the current server date.
 
 ---
 
@@ -122,13 +124,14 @@ A partitioned table for analytics events.
 
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
-| `id` | `bigint` | **Primary Key**, Identity | Unique identifier for the event. |
+| `id` | `bigint` | Identity | Unique identifier for the event. |
 | `user_id` | `uuid` | **Foreign Key** -> `auth.users(id)` ON DELETE SET NULL | The user who triggered the event. |
 | `event_type` | `text` | Not Null | Type of event (e.g., "search", "availability_refresh"). |
 | `occurred_at` | `timestamptz` | Not Null, `default now()` | Timestamp of the event. |
 | `properties` | `jsonb` | | Additional event data (e.g., `{ "query": "...", "results_count": 5 }`). |
 
 **Partitioning:** Partition by `RANGE(occurred_at)` monthly.
+**Primary Key:** Composite (`id`, `occurred_at`) to include the partition key as required for partitioned tables.
 
 ---
 
@@ -137,7 +140,7 @@ A partitioned table for logging errors from external API integrations.
 
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
-| `id` | `bigint` | **Primary Key**, Identity | Unique identifier for the log entry. |
+| `id` | `bigint` | Identity | Unique identifier for the log entry. |
 | `api_type` | `text` | Not Null | The external API that produced the error (e.g., "tmdb", "watchmode"). |
 | `error_message`| `text` | Not Null | The error message. |
 | `error_details`| `jsonb` | | Detailed error information (e.g., stack trace, request body). |
@@ -145,6 +148,7 @@ A partitioned table for logging errors from external API integrations.
 | `occurred_at` | `timestamptz` | Not Null, `default now()` | Timestamp of the error. |
 
 **Partitioning:** Partition by `RANGE(occurred_at)` monthly.
+**Primary Key:** Composite (`id`, `occurred_at`) to include the partition key as required for partitioned tables.
 
 ## 2. Relationships
 
@@ -160,9 +164,9 @@ A partitioned table for logging errors from external API integrations.
 ## 3. Indexes
 
 ### `movie`
-- **Partial Unique Index** on `tmdb_id` WHERE `tmdb_id` IS NOT NULL.
-- **Partial Unique Index** on `watchmode_id` WHERE `watchmode_id` IS NOT NULL.
-- **GIN Index** on `unaccent(lower(primary_title))` using `pg_trgm_ops` for fast, case-insensitive, accent-insensitive search.
+- **Partial Index (non-unique)** on `tmdb_id` WHERE `tmdb_id` IS NOT NULL.
+- **Partial Index (non-unique)** on `watchmode_id` WHERE `watchmode_id` IS NOT NULL.
+- **GIN Index** on `public.immutable_unaccent(lower(primary_title))` using `extensions.gin_trgm_ops` for fast, case-insensitive, accent-insensitive search.
 - **B-Tree Index** on `start_year` for filtering by year.
 - **GIN Index** on `genres` for filtering by genre.
 

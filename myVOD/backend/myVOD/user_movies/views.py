@@ -2,14 +2,14 @@ import logging
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from django.db import DatabaseError
-from movies.models import UserMovie, Movie
+from movies.models import UserMovie, Movie  # type: ignore
 from .serializers import (
     UserMovieSerializer,
     UserMovieQueryParamsSerializer,
     AddUserMovieCommandSerializer,
     UpdateUserMovieCommandSerializer
 )
-from services.user_movies_service import (
+from services.user_movies_service import (  # type: ignore
     build_user_movies_queryset,
     add_movie_to_watchlist,
     update_user_movie,
