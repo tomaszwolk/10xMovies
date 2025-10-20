@@ -1,7 +1,7 @@
 import logging
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
-from django.db import DatabaseError
+from django.db import DatabaseError, IntegrityError
 from movies.models import UserMovie, Movie  # type: ignore
 from .serializers import (
     UserMovieSerializer,
@@ -54,7 +54,7 @@ class UserMovieViewSet(viewsets.ModelViewSet):
         List user's movies with filtering and ordering.
 
         Implements business logic:
-        - Row Level Security (filters by authenticated user)
+        - Application-level filtering by authenticated user
         - Status filtering (watchlist vs watched)
         - Availability filtering (available/unavailable on user's platforms)
         - Ordering support
@@ -168,6 +168,16 @@ class UserMovieViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_409_CONFLICT
             )
 
+        except IntegrityError:
+            # Handle race condition on unique (user_id, tconst)
+            logger.info(
+                f"IntegrityError (duplicate) when adding movie for user {request.user.id}: {tconst}"
+            )
+            return Response(
+                {"detail": "Movie is already on the watchlist"},
+                status=status.HTTP_409_CONFLICT
+            )
+
         except DatabaseError as e:
             logger.error(
                 f"Database error while adding movie to watchlist for user {request.user.id}: {str(e)}",
@@ -265,6 +275,13 @@ class UserMovieViewSet(viewsets.ModelViewSet):
                 {"detail": "An unexpected error occurred. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Delegate PATCH requests to the same logic as update(),
+        ensuring action-based updates are handled consistently.
+        """
+        return self.update(request, *args, **kwargs)
 
     def destroy(self, request, pk=None, *args, **kwargs):
         """
