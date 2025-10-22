@@ -1,9 +1,71 @@
 cd myVOD/backend/myVOD
+# all
+python manage.py test --verbosity 2
+
+# specific
 python manage.py test user_movies
 python manage.py test movies services.tests.test_movie_search_service
+python manage.py test myVOD.tests.test_platforms
+
+#check those tests
+python manage.py test myVOD.tests.test_platforms --verbosity 2
+python manage.py test movies.tests --verbosity 2
+python manage.py test services.tests.test_movie_search_service --verbosity 2
+
+# ============================================
+# TEST GET /api/platforms/
+# ============================================
+
+# 1. Test successful platform retrieval (no auth required)
+curl -X GET http://localhost:8000/api/platforms/ \
+  -H "Content-Type: application/json"
+
+# Expected: 200 OK with array of platforms
+# [
+#   {"id": 1, "platform_slug": "netflix", "platform_name": "Netflix"},
+#   {"id": 2, "platform_slug": "hbo-max", "platform_name": "HBO Max"}
+# ]
 
 
-GIN index:
+# 2. Verify platforms in database using Django shell
+cd myVOD/backend/myVOD
+python manage.py shell
+
+from movies.models import Platform
+
+# Check if platforms exist
+platforms = Platform.objects.all()
+print(f"Total platforms: {platforms.count()}")
+for p in platforms:
+    print(f"ID: {p.id}, Slug: {p.platform_slug}, Name: {p.platform_name}")
+
+# If no platforms exist, add sample data:
+Platform.objects.get_or_create(
+    platform_slug='netflix',
+    defaults={'platform_name': 'Netflix'}
+)
+Platform.objects.get_or_create(
+    platform_slug='hbo-max',
+    defaults={'platform_name': 'HBO Max'}
+)
+Platform.objects.get_or_create(
+    platform_slug='disney-plus',
+    defaults={'platform_name': 'Disney+'}
+)
+Platform.objects.get_or_create(
+    platform_slug='amazon-prime',
+    defaults={'platform_name': 'Amazon Prime Video'}
+)
+
+
+# 3. Run unit tests for platforms endpoint
+cd myVOD/backend/myVOD
+python manage.py test myVOD.tests.test_platforms
+
+
+# ============================================
+# GIN index verification:
+# ============================================
 cd myVOD/backend/myVOD
 python manage.py shell
 

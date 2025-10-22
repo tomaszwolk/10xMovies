@@ -7,6 +7,8 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 from movies.models import Movie  # type: ignore
+from django.db import DatabaseError
+from unittest.mock import patch
 
 
 class MovieSearchAPITests(APITestCase):
@@ -274,3 +276,41 @@ class MovieSearchAPITests(APITestCase):
 
         # Should be limited (default 20 in service)
         self.assertLessEqual(len(response.data), 20)
+
+    def test_methods_not_allowed(self):
+        """Movies endpoint should allow only GET method."""
+        url = reverse('movie-search')
+
+        self.assertEqual(self.client.post(url, {}).status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(self.client.put(url, {}).status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(self.client.patch(url, {}).status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_accent_insensitive_search(self):
+        """Search should be accent-insensitive (e.g., Amélie vs Amelie)."""
+        # Create a movie with an accented title
+        Movie.objects.create(
+            tconst="tt0211915",
+            primary_title="Amélie",
+            start_year=2001,
+            avg_rating=8.3,
+        )
+
+        url = reverse('movie-search')
+        # Search without accent
+        response = self.client.get(url, {'search': 'Amelie'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = [m['primary_title'] for m in response.data]
+        self.assertIn('Amélie', titles)
+
+    def test_internal_server_error_from_service(self):
+        """Movies endpoint should return 500 when service raises DatabaseError."""
+        url = reverse('movie-search')
+
+        with patch('movies.views.search_movies', side_effect=DatabaseError("DB error")):
+            response = self.client.get(url, {'search': 'Interstellar'})
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertIsInstance(response.data, dict)
+        self.assertIn('error', response.data)

@@ -184,3 +184,19 @@ class MovieSearchServiceTests(TestCase):
         self.assertTrue(
             any("Lord of the Rings" in title for title in result_titles)
         )
+
+    def test_search_accent_insensitive(self):
+        """Search should be accent-insensitive (e.g., Amélie vs Amelie)."""
+        Movie.objects.create(
+            tconst="tt0211915",
+            primary_title="Amélie",
+            start_year=2001,
+            avg_rating=8.3,
+        )
+
+        results = search_movies("Amelie")
+
+        self.assertGreaterEqual(len(results), 1)
+        titles = [movie.primary_title for movie in results]
+        self.assertIn("Amélie", titles)
+        

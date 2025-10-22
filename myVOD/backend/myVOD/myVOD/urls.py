@@ -51,10 +51,11 @@ urlpatterns = [
     # Movie Search (Public)
     path("api/movies/", include("movies.urls")),
 
+    # Platforms (Public)
+    path("api/platforms/", views.PlatformListView.as_view(), name="platforms"),
+
     # TODO: Implement these endpoints
     # path("api/register/", views.RegisterView.as_view(), name="register"),
     # path("api/me/", views.UserProfileView.as_view(), name="user-profile"),
-    # path("api/platforms/", views.PlatformListView.as_view(), name="platforms"),
     # path("api/suggestions/", views.AISuggestionsView.as_view(), name="suggestions"),
 ]
-

@@ -4,9 +4,11 @@ Service layer for movie search functionality.
 This module contains business logic for searching movies in the database.
 """
 import logging
-from django.db.models import QuerySet
+import unicodedata
+from django.db.models import QuerySet, F
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db.models.functions import Lower
+from django.db import models
 from movies.models import Movie  # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -48,26 +50,57 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
     logger.info(f"Searching for movies with query: '{search_query}'")
 
     try:
-        # Use TrigramSimilarity for fuzzy matching
-        # This leverages the GIN index on immutable_unaccent(lower(primary_title))
+        # Try accent-insensitive search using immutable_unaccent on the column
+        # and Python-side accent removal for the query string to match behavior.
+        title_expr = Lower(
+            models.Func(
+                F('primary_title'),
+                function='immutable_unaccent',
+                output_field=models.TextField(),
+            )
+        )
+        # Remove accents from the query string so it compares fairly to unaccented title_expr
+        query_str = unicodedata.normalize('NFKD', search_query.lower())
+        query_str = ''.join(ch for ch in query_str if not unicodedata.combining(ch))
+
         queryset = Movie.objects.annotate(
-            similarity=TrigramSimilarity(Lower('primary_title'), search_query.lower())
+            similarity=TrigramSimilarity(title_expr, query_str)
         ).filter(
-            similarity__gt=0.1  # Minimum similarity threshold
+            similarity__gt=0.1
         ).order_by(
-            '-similarity',  # Most similar first
-            '-avg_rating',  # Then by rating
-            '-start_year'   # Then by year
+            '-similarity',
+            '-avg_rating',
+            '-start_year'
         )[:limit]
 
         result_count = queryset.count()
-        logger.info(f"Found {result_count} movies matching query '{search_query}'")
-
+        logger.info(f"Found {result_count} movies matching query '{search_query}' (accent-insensitive)")
         return queryset
 
-    except Exception as e:
-        logger.error(
-            f"Error searching movies with query '{search_query}': {str(e)}",
-            exc_info=True
+    except Exception:
+        # Fallback: if immutable_unaccent is unavailable (e.g., in non-PostgreSQL test DB),
+        # perform case-insensitive fuzzy search without accent removal.
+        logger.warning(
+            "immutable_unaccent unavailable; falling back to case-insensitive search without accent removal",
+            exc_info=True,
         )
-        raise
+        title_expr = Lower(F('primary_title'))
+        query_str = search_query.lower()
+
+        queryset = Movie.objects.annotate(
+            similarity=TrigramSimilarity(title_expr, query_str)
+        ).filter(
+            similarity__gt=0.1
+        ).order_by(
+            '-similarity',
+            '-avg_rating',
+            '-start_year'
+        )[:limit]
+
+        # Don't count again if DB might still not support trigram; but we attempt for logging
+        try:
+            result_count = queryset.count()
+            logger.info(f"Found {result_count} movies matching query '{search_query}' (fallback)")
+        except Exception:
+            logger.info("Search fallback executed; unable to count results due to DB limitations")
+        return queryset

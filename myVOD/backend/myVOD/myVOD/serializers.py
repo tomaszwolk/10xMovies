@@ -4,7 +4,8 @@ Custom serializers for myVOD project.
 
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
-from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth import get_user_model
+from movies.models import Platform
 
 User = get_user_model()
 
@@ -64,3 +65,20 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         return data
 
+
+class PlatformSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Platform model.
+
+    This maps to PlatformDto on the frontend.
+    Returns all platform information for public display.
+
+    Fields:
+        - id: Platform unique identifier
+        - platform_slug: URL-friendly slug (e.g., "netflix")
+        - platform_name: User-friendly name (e.g., "Netflix")
+    """
+
+    class Meta:
+        model = Platform
+        fields = ['id', 'platform_slug', 'platform_name']
