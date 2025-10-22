@@ -82,3 +82,69 @@ class PlatformSerializer(serializers.ModelSerializer):
     class Meta:
         model = Platform
         fields = ['id', 'platform_slug', 'platform_name']
+
+
+class UserProfileSerializer(serializers.Serializer):
+    """
+    Serializer for user profile response.
+
+    This maps to UserProfileDto on the frontend.
+    Returns authenticated user's email and their selected VOD platforms.
+
+    Response for GET /api/me/
+    """
+    email = serializers.EmailField()
+    platforms = PlatformSerializer(many=True, read_only=True)
+
+
+class UpdateUserProfileSerializer(serializers.Serializer):
+    """
+    Serializer for updating user profile.
+
+    This maps to UpdateUserProfileCommand on the frontend.
+    Validates the platform IDs provided in the request body.
+
+    Request body for PATCH /api/me/
+    """
+    platforms = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=True,
+        allow_empty=True,
+        help_text="List of platform IDs to associate with the user"
+    )
+
+    def validate_platforms(self, value):
+        """
+        Validate that all platform IDs exist in the database.
+
+        Args:
+            value: List of platform IDs
+
+        Returns:
+            List of validated platform IDs
+
+        Raises:
+            ValidationError: If any platform ID doesn't exist
+        """
+        if not value:
+            # Empty list is valid - user wants to remove all platforms
+            return value
+
+        # Check for duplicates
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError(
+                "Platform IDs must be unique"
+            )
+
+        # Verify all platform IDs exist
+        existing_platform_ids = set(
+            Platform.objects.filter(id__in=value).values_list('id', flat=True)
+        )
+
+        invalid_ids = set(value) - existing_platform_ids
+        if invalid_ids:
+            raise serializers.ValidationError(
+                f"Invalid platform IDs: {sorted(invalid_ids)}"
+            )
+
+        return value
