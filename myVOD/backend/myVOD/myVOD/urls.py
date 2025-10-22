@@ -48,11 +48,13 @@ urlpatterns = [
     # User Movies (Watchlist & Watched History)
     path("api/user-movies/", include("user_movies.urls")),
 
+    # Movie Search (Public)
+    path("api/movies/", include("movies.urls")),
+
     # TODO: Implement these endpoints
     # path("api/register/", views.RegisterView.as_view(), name="register"),
     # path("api/me/", views.UserProfileView.as_view(), name="user-profile"),
     # path("api/platforms/", views.PlatformListView.as_view(), name="platforms"),
-    # path("api/movies/", views.MovieSearchView.as_view(), name="movies"),
     # path("api/suggestions/", views.AISuggestionsView.as_view(), name="suggestions"),
 ]
 

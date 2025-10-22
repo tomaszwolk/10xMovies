@@ -2,5 +2,5 @@
 .mypy_cache/*
 .env
 IMDB_data_set/*
-__pycache__/*
-.VSCodeCounter/*
+__pycache__
+.VSCodeCounter

@@ -1,0 +1,46 @@
+cd myVOD/backend/myVOD
+python manage.py test user_movies
+python manage.py test movies services.tests.test_movie_search_service
+
+
+GIN index:
+cd myVOD/backend/myVOD
+python manage.py shell
+
+```
+from django.db import connection
+
+# Sprawdź indeksy
+with connection.cursor() as cursor:
+    cursor.execute("""
+        SELECT indexname, indexdef 
+        FROM pg_indexes 
+        WHERE tablename = 'movie' 
+        AND indexdef LIKE '%gin%'
+    """)
+    for row in cursor.fetchall():
+        print(row)
+
+# Sprawdź rozszerzenia
+with connection.cursor() as cursor:
+    cursor.execute("""
+        SELECT extname, extversion 
+        FROM pg_extension 
+        WHERE extname IN ('pg_trgm', 'unaccent')
+    """)
+    for row in cursor.fetchall():
+        print(row)
+
+# EXPLAIN ANALYZE
+with connection.cursor() as cursor:
+    cursor.execute("""
+        EXPLAIN ANALYZE
+        SELECT tconst, primary_title
+        FROM movie
+        WHERE similarity(lower(primary_title), lower('interstellar')) > 0.1
+        ORDER BY similarity(lower(primary_title), lower('interstellar')) DESC
+        LIMIT 20
+    """)
+    for row in cursor.fetchall():
+        print(row[0])
+````
