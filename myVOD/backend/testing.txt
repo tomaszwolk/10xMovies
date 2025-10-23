@@ -2,18 +2,15 @@ cd myVOD/backend/myVOD
 # all
 python manage.py test --verbosity 2
 
-# specific
-python manage.py test user_movies
-python manage.py test movies services.tests.test_movie_search_service
+# specific modules
 python manage.py test myVOD.tests.test_platforms
-
-#check those tests
-python manage.py test myVOD.tests.test_platforms --verbosity 2
-python manage.py test movies.tests --verbosity 2
-python manage.py test services.tests.test_movie_search_service --verbosity 2
-python manage.py test myVOD.tests.test_user_profile --verbosity 2
-python manage.py test services.tests.test_user_registration_service
+python manage.py test myVOD.tests.test_user_profile
 python manage.py test myVOD.tests.test_registration
+python manage.py test myVOD.tests.test_ai_suggestions
+python manage.py test movies.tests
+python manage.py test services.tests.test_movie_search_service
+python manage.py test services.tests.test_user_registration_service
+python manage.py test services.tests.test_ai_suggestions_service
 
 # ============================================
 # TEST GET /api/platforms/
@@ -109,3 +106,237 @@ with connection.cursor() as cursor:
     for row in cursor.fetchall():
         print(row[0])
 ````
+
+
+# ============================================
+# TEST GET /api/suggestions/
+# ============================================
+
+# NOTE: Replace <ACCESS_TOKEN> with actual JWT token from login
+
+# 1. Test without authentication (should return 401)
+curl -X GET http://localhost:8000/api/suggestions/ \
+  -H "Content-Type: application/json"
+
+# Expected: 401 Unauthorized
+# {"detail": "Authentication credentials were not provided."}
+
+
+# 2. Test with authentication but no movies in watchlist/watched (should return 404)
+curl -X GET http://localhost:8000/api/suggestions/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# Expected: 404 Not Found
+# {
+#   "error": "You need to add movies to your watchlist or mark movies as watched before we can generate personalized suggestions."
+# }
+
+
+# 3. Test successful suggestions generation (first request of the day)
+# First, add some movies to user's watchlist using Django shell or POST /api/user-movies/
+curl -X GET http://localhost:8000/api/suggestions/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# Expected: 200 OK
+# {
+#   "expires_at": "2025-10-23T23:59:59Z",
+#   "suggestions": [
+#     {
+#       "tconst": "tt0133093",
+#       "primary_title": "The Matrix",
+#       "start_year": 1999,
+#       "justification": "AI-generated justification",
+#       "availability": [
+#         {
+#           "platform_id": 1,
+#           "platform_name": "Netflix",
+#           "is_available": true
+#         }
+#       ]
+#     }
+#   ]
+# }
+
+
+# 4. Test cached suggestions (second request on the same day)
+curl -X GET http://localhost:8000/api/suggestions/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# Expected: 200 OK (same response as before, from cache)
+# Should be instant (no AI call)
+
+
+# 5. Prepare test data using Django shell
+cd myVOD/backend/myVOD
+python manage.py shell
+
+from django.contrib.auth import get_user_model
+from movies.models import Movie, UserMovie, Platform, UserPlatform, MovieAvailability
+from django.utils import timezone
+import uuid
+
+User = get_user_model()
+
+# Get or create test user
+user = User.objects.filter(email='test@example.com').first()
+if not user:
+    user = User.objects.create_user(
+        username='test@example.com',
+        email='test@example.com',
+        password='Test1234'
+    )
+    print(f"Created test user: {user.email}")
+
+# Add test movie
+movie, created = Movie.objects.get_or_create(
+    tconst='tt0111161',
+    defaults={
+        'primary_title': 'The Shawshank Redemption',
+        'start_year': 1994,
+        'genres': ['Drama'],
+        'avg_rating': 9.3
+    }
+)
+print(f"Movie: {movie.primary_title} ({'created' if created else 'exists'})")
+
+# Add movie to user's watchlist
+user_movie, created = UserMovie.objects.get_or_create(
+    user_id=user.id,
+    tconst=movie,
+    defaults={'watchlisted_at': timezone.now()}
+)
+print(f"Added to watchlist: {user_movie.tconst.primary_title} ({'created' if created else 'exists'})")
+
+# Add platform
+platform, created = Platform.objects.get_or_create(
+    platform_slug='netflix',
+    defaults={'platform_name': 'Netflix'}
+)
+print(f"Platform: {platform.platform_name} ({'created' if created else 'exists'})")
+
+# Add user platform
+user_platform, created = UserPlatform.objects.get_or_create(
+    user_id=user.id,
+    platform=platform
+)
+print(f"User platform added ({'created' if created else 'exists'})")
+
+# Add movie availability
+availability, created = MovieAvailability.objects.get_or_create(
+    tconst=movie,
+    platform=platform,
+    defaults={
+        'is_available': True,
+        'last_checked': timezone.now(),
+        'source': 'manual'
+    }
+)
+print(f"Movie availability: {availability.tconst.primary_title} on {availability.platform.platform_name} ({'created' if created else 'exists'})")
+
+# Get JWT token for testing
+print("\nTo get JWT token, run:")
+print(f"curl -X POST http://localhost:8000/api/token/ -H 'Content-Type: application/json' -d '{{\"email\": \"{user.email}\", \"password\": \"Test1234\"}}'")
+
+
+# 6. Check AI suggestion batches in database
+cd myVOD/backend/myVOD
+python manage.py shell
+
+from movies.models import AiSuggestionBatch
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+User = get_user_model()
+user = User.objects.filter(email='test@example.com').first()
+
+if user:
+    # Check if user has any suggestion batches
+    batches = AiSuggestionBatch.objects.filter(user_id=user.id).order_by('-generated_at')
+    print(f"Total batches for {user.email}: {batches.count()}")
+    
+    for batch in batches:
+        print(f"\nBatch ID: {batch.id}")
+        print(f"Generated at: {batch.generated_at}")
+        print(f"Expires at: {batch.expires_at}")
+        print(f"Prompt: {batch.prompt}")
+        print(f"Suggestions count: {len(batch.response) if batch.response else 0}")
+        print(f"Is expired: {batch.expires_at < timezone.now()}")
+        
+    # Check if suggestions are cached for today
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = timezone.now().replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    today_batch = AiSuggestionBatch.objects.filter(
+        user_id=user.id,
+        generated_at__gte=today_start,
+        generated_at__lte=today_end
+    ).first()
+    
+    if today_batch:
+        print(f"\nUser has suggestions from today (batch_id={today_batch.id})")
+    else:
+        print("\nNo suggestions from today - API will generate new ones")
+
+
+# 7. Run unit tests for suggestions service (16 tests)
+cd myVOD/backend/myVOD
+python manage.py test services.tests.test_ai_suggestions_service --verbosity 2
+
+# Run specific test class
+python manage.py test services.tests.test_ai_suggestions_service.GetOrGenerateSuggestionsTests
+python manage.py test services.tests.test_ai_suggestions_service.FormatCachedSuggestionsTests
+python manage.py test services.tests.test_ai_suggestions_service.GetMovieAvailabilityTests
+python manage.py test services.tests.test_ai_suggestions_service.LogIntegrationErrorTests
+
+
+# 8. Run integration tests for suggestions endpoint (14 tests)
+cd myVOD/backend/myVOD
+python manage.py test myVOD.tests.test_ai_suggestions --verbosity 2
+
+# Run specific integration test
+python manage.py test myVOD.tests.test_ai_suggestions.AISuggestionsGetAPITests
+
+
+# 8.1. Run all AI suggestions tests (unit + integration)
+cd myVOD/backend/myVOD
+python manage.py test services.tests.test_ai_suggestions_service myVOD.tests.test_ai_suggestions --verbosity 2
+
+
+# 9. Check integration error logs
+cd myVOD/backend/myVOD
+python manage.py shell
+
+from movies.models import IntegrationErrorLog
+
+# Check recent AI errors
+errors = IntegrationErrorLog.objects.filter(
+    api_type='gemini'
+).order_by('-occurred_at')[:10]
+
+print(f"Recent Gemini API errors: {errors.count()}")
+for error in errors:
+    print(f"\nError ID: {error.id}")
+    print(f"Occurred at: {error.occurred_at}")
+    print(f"Message: {error.error_message}")
+    print(f"Details: {error.error_details}")
+    print(f"User ID: {error.user_id}")
+
+
+# 10. Clear cached suggestions for testing
+cd myVOD/backend/myVOD
+python manage.py shell
+
+from movies.models import AiSuggestionBatch
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+user = User.objects.filter(email='test@example.com').first()
+
+if user:
+    # Delete all suggestion batches for user
+    deleted_count = AiSuggestionBatch.objects.filter(user_id=user.id).delete()[0]
+    print(f"Deleted {deleted_count} suggestion batches for {user.email}")
+    print("User can now get fresh suggestions")

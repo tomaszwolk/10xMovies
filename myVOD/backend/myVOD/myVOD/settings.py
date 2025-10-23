@@ -209,3 +209,6 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Remove silenced system checks after fixing model mapping
+
+# Google Gemini AI Configuration
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')

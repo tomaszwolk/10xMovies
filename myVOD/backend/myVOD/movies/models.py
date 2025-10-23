@@ -1,11 +1,10 @@
 from django.db import models
+from django.contrib.postgres.fields import ArrayField
 
 # Uwaga: Modele te zostały wygenerowane ręcznie na podstawie schematu SQL.
-# Klucze obce wskazujące na tabelę `auth.users` z Supabase są zdefiniowane jako
-# zwykłe pola UUIDField, ponieważ Django ORM nie może tworzyć relacji
-# między różnymi schematami baz danych w prosty sposób.
-# Logika łączenia tych modeli z użytkownikiem będzie musiała być
-# zaimplementowana w widokach/serwisach.
+# UWAGA TYMCZASOWA: user_id jest obecnie UUIDField, ponieważ baza danych używa UUID.
+# W przyszłości należy zmienić bazę danych na INTEGER i użyć ForeignKey(User).
+# managed=False oznacza że tabele są zarządzane przez Supabase.
 
 
 class Platform(models.Model):
@@ -23,7 +22,7 @@ class Movie(models.Model):
     primary_title = models.TextField()
     original_title = models.TextField(blank=True, null=True)
     start_year = models.SmallIntegerField(blank=True, null=True)
-    genres = models.JSONField(blank=True, null=True)  # Używamy JSONField dla text[]
+    genres = ArrayField(models.TextField(), blank=True, null=True)  # PostgreSQL text[] array
     avg_rating = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
     num_votes = models.IntegerField(blank=True, null=True)
     poster_path = models.TextField(blank=True, null=True)

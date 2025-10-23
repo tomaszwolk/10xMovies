@@ -19,13 +19,19 @@ from .serializers import (
     UserProfileSerializer,
     UpdateUserProfileSerializer,
     RegisterUserSerializer,
-    RegisteredUserSerializer
+    RegisteredUserSerializer,
+    AISuggestionsSerializer
 )
 from services.user_profile_service import (
     get_user_profile,
     update_user_platforms
 )
 from services.user_registration_service import register_user
+from services.ai_suggestions_service import (
+    get_or_generate_suggestions,
+    InsufficientDataError,
+    RateLimitError
+)
 
 logger = logging.getLogger(__name__)
 
@@ -386,6 +392,118 @@ class RegisterView(APIView):
         except Exception as e:
             logger.error(
                 f"Unexpected error during user registration: {str(e)}",
+                exc_info=True
+            )
+            return Response(
+                {"error": "An unexpected error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AISuggestionsView(APIView):
+    """
+    API view for AI-powered movie suggestions.
+
+    GET /api/suggestions/
+
+    Generates or retrieves cached AI movie suggestions for the authenticated user.
+    Rate limited to one suggestion batch per calendar day (server timezone).
+
+    Returns:
+        200: AISuggestionsDto with suggestions and expiration time
+        401: Missing or invalid authentication
+        404: User has no movies in watchlist or watched history
+        429: User already received suggestions today
+        500: Internal server error
+
+    Business Logic:
+        - Check for cached suggestions from today (same calendar date)
+        - If cached suggestions exist, return them
+        - If no cached suggestions:
+          - Validate user has watchlist/watched movies (404 if empty)
+          - Generate new suggestions using AI (Gemini API)
+          - Cache suggestions with expiration at end of day (23:59:59)
+          - Include availability for user's selected platforms
+        - Rate limiting based on calendar date, not 24-hour rolling window
+          - Example: Request at 15:00 on Oct 20 → next allowed at 00:00 on Oct 21
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Get AI movie suggestions",
+        description=(
+            "Generates or retrieves cached AI-powered movie suggestions based on "
+            "the user's watchlist and watched history. "
+            "Rate limited to one request per calendar day (server timezone). "
+            "Suggestions expire at the end of the day (23:59:59) and new suggestions "
+            "can be requested starting from the next day (00:00:00). "
+            "Requires JWT authentication."
+        ),
+        responses={
+            200: AISuggestionsSerializer,
+            401: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+            429: OpenApiTypes.OBJECT,
+            500: OpenApiTypes.OBJECT,
+        },
+        tags=['AI Suggestions'],
+    )
+    def get(self, request):
+        """
+        Handle GET request for AI suggestions.
+
+        Implements guard clauses for early error returns:
+        1. User is already authenticated (permission class)
+        2. Check for insufficient data (no watchlist/watched movies)
+        3. Check rate limit (suggestions already generated today)
+        4. Get or generate suggestions via service layer
+        5. Serialize and return results
+        """
+        try:
+            # Get or generate suggestions via service layer
+            suggestions_data = get_or_generate_suggestions(request.user)
+
+            # Serialize response
+            serializer = AISuggestionsSerializer(suggestions_data)
+
+            logger.info(
+                f"Successfully returned {len(suggestions_data['suggestions'])} "
+                f"suggestions for user {request.user.email}"
+            )
+
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except InsufficientDataError as e:
+            logger.warning(
+                f"Insufficient data for user {request.user.email}: {str(e)}"
+            )
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        except RateLimitError as e:
+            logger.info(
+                f"Rate limit exceeded for user {request.user.email}"
+            )
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        except DatabaseError as e:
+            logger.error(
+                f"Database error while fetching suggestions for {request.user.email}: {str(e)}",
+                exc_info=True
+            )
+            return Response(
+                {"error": "An error occurred while generating suggestions. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Unexpected error while fetching suggestions for {request.user.email}: {str(e)}",
                 exc_info=True
             )
             return Response(

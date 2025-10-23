@@ -243,3 +243,58 @@ class RegisteredUserSerializer(serializers.Serializer):
         read_only=True,
         help_text="Registered user's email address"
     )
+
+
+class MovieAvailabilitySerializer(serializers.Serializer):
+    """
+    Serializer for movie availability on a specific platform.
+
+    This maps to MovieAvailabilityDto on the frontend.
+    Used in AI suggestions and user movie responses.
+
+    Fields:
+        - platform_id: Platform unique identifier
+        - platform_name: User-friendly platform name
+        - is_available: Boolean indicating if movie is available on this platform
+    """
+    platform_id = serializers.IntegerField()
+    platform_name = serializers.CharField()
+    is_available = serializers.BooleanField()
+
+
+class SuggestionItemSerializer(serializers.Serializer):
+    """
+    Serializer for a single AI-generated movie suggestion.
+
+    This maps to SuggestionItemDto on the frontend.
+    Nested within AISuggestionsSerializer.
+
+    Fields:
+        - tconst: IMDb movie identifier
+        - primary_title: Movie title
+        - start_year: Release year
+        - justification: AI-generated reason for the suggestion
+        - availability: List of platform availability information
+    """
+    tconst = serializers.CharField()
+    primary_title = serializers.CharField()
+    start_year = serializers.IntegerField(allow_null=True)
+    justification = serializers.CharField()
+    availability = MovieAvailabilitySerializer(many=True)
+
+
+class AISuggestionsSerializer(serializers.Serializer):
+    """
+    Serializer for AI movie suggestions response.
+
+    This maps to AISuggestionsDto on the frontend.
+    Returns a batch of AI-generated movie suggestions with expiration time.
+
+    Response for GET /api/suggestions/
+
+    Fields:
+        - expires_at: ISO 8601 timestamp when suggestions expire (end of day)
+        - suggestions: List of suggested movies with justifications and availability
+    """
+    expires_at = serializers.DateTimeField()
+    suggestions = SuggestionItemSerializer(many=True)
