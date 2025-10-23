@@ -5,67 +5,48 @@ from movies.models import UserMovie, MovieAvailability, UserPlatform, Movie  # t
 import uuid
 
 
-def _get_supabase_user_uuid(email: str):
-    """
-    Get the Supabase UUID for a user by email from auth.users table.
-
-    Args:
-        email: User email address
-
-    Returns:
-        UUID string of the Supabase user, or None if not found
-    """
-    from django.db import connection
-
-    try:
-        with connection.cursor() as cursor:
-            # Query directly from auth schema
-            cursor.execute(
-                "SELECT id FROM auth.users WHERE email = %s LIMIT 1",
-                [email]
-            )
-            row = cursor.fetchone()
-
-            if row:
-                return str(row[0])
-            return None
-
-    except Exception as e:
-        raise Exception(f"Error fetching Supabase user: {str(e)}")
-
-
 def _get_user_platform_ids(user_id):
     return list(
         UserPlatform.objects.filter(user_id=user_id).values_list("platform_id", flat=True)
     )
 
 
-def _is_uuid_like(value) -> bool:
-    """Check if value can be interpreted as a UUID string."""
-    try:
-        uuid.UUID(str(value))
-        return True
-    except Exception:
-        return False
+def _get_supabase_user_uuid(email: str):
+    """
+    Get the Supabase UUID for a user by email from auth.users table.
+
+    Returns UUID string or raises Exception if not found.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id FROM auth.users WHERE email = %s LIMIT 1",
+            [email]
+        )
+        row = cursor.fetchone()
+        if row:
+            return str(row[0])
+    raise Exception(f"Supabase user not found for email: {email}")
 
 
 def _resolve_user_uuid(user):
-    """Resolve the canonical UUID for the given user.
+    """Resolve canonical UUID for the given user.
 
     Strategy:
-    - If user.id looks like a UUID, trust and return it (works for tests and direct UUID usage)
-    - Else, fallback to Supabase lookup by email (works for Django auth PKs)
+    - If user.id looks like a UUID, trust and return it (works for tests using Mock with UUID)
+    - Else, fallback to Supabase lookup by email (works for Django auth.User with int PK)
     """
-    # Prefer direct UUID if available
-    if hasattr(user, "id") and _is_uuid_like(user.id):
-        return str(uuid.UUID(str(user.id)))
+    # Prefer direct UUID on the user object
+    if hasattr(user, "id"):
+        try:
+            return str(uuid.UUID(str(user.id)))
+        except Exception:
+            pass
 
     # Fallback to Supabase auth.users lookup by email
     if hasattr(user, "email"):
-        supabase_uuid = _get_supabase_user_uuid(user.email)
-        if supabase_uuid:
-            return supabase_uuid
-        raise Exception(f"Supabase user not found for email: {user.email}")
+        return _get_supabase_user_uuid(user.email)
 
     raise Exception("Unable to resolve user UUID: user has neither UUID-like id nor email")
 
@@ -86,7 +67,7 @@ def build_user_movies_queryset(
         is_available: Optional boolean to filter by availability across user's platforms.
     """
 
-    # Resolve canonical user UUID (handles both direct UUID and Django auth PK flows)
+    # Resolve canonical user UUID (custom user model has UUID id)
     supabase_user_uuid = _resolve_user_uuid(user)
     platform_ids = _get_user_platform_ids(supabase_user_uuid)
 

@@ -12,6 +12,8 @@ python manage.py test myVOD.tests.test_platforms --verbosity 2
 python manage.py test movies.tests --verbosity 2
 python manage.py test services.tests.test_movie_search_service --verbosity 2
 python manage.py test myVOD.tests.test_user_profile --verbosity 2
+python manage.py test services.tests.test_user_registration_service
+python manage.py test myVOD.tests.test_registration
 
 # ============================================
 # TEST GET /api/platforms/

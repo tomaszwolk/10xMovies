@@ -4,7 +4,7 @@ Views for myVOD project root.
 
 import logging
 from django.shortcuts import redirect
-from django.db import DatabaseError
+from django.db import DatabaseError, IntegrityError
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -17,12 +17,15 @@ from .serializers import (
     EmailTokenObtainPairSerializer,
     PlatformSerializer,
     UserProfileSerializer,
-    UpdateUserProfileSerializer
+    UpdateUserProfileSerializer,
+    RegisterUserSerializer,
+    RegisteredUserSerializer
 )
 from services.user_profile_service import (
     get_user_profile,
     update_user_platforms
 )
+from services.user_registration_service import register_user
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +275,117 @@ class UserProfileView(APIView):
         except Exception as e:
             logger.error(
                 f"Unexpected error while updating user profile: {str(e)}",
+                exc_info=True
+            )
+            return Response(
+                {"error": "An unexpected error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class RegisterView(APIView):
+    """
+    API view for user registration.
+
+    POST /api/register/
+
+    This is a public endpoint (no authentication required).
+    Creates a new user account with the provided email and password.
+
+    Returns:
+        201: RegisteredUserDto with email
+        400: Invalid email format, weak password, or user already exists
+        500: Internal server error
+
+    Business Logic:
+        - Validates email format
+        - Enforces password policy: minimum 8 characters, must contain letters and numbers
+        - Uses Django password validators
+        - Hashes password using Django's authentication system
+        - Creates user record with auto-generated UUID
+        - User email must be unique
+        - Returns only email in response (no sensitive data)
+        - Does NOT automatically log in the user (user must call /api/token/)
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="Register a new user",
+        description=(
+            "Creates a new user account with the provided email and password. "
+            "This is a public endpoint that does not require authentication. "
+            "Password must be at least 8 characters and contain both letters and numbers. "
+            "Email must be unique. "
+            "After successful registration, user must call /api/token/ to obtain JWT tokens."
+        ),
+        request=RegisterUserSerializer,
+        responses={
+            201: RegisteredUserSerializer,
+            400: OpenApiTypes.OBJECT,
+            500: OpenApiTypes.OBJECT,
+        },
+        tags=['Authentication'],
+    )
+    def post(self, request):
+        """
+        Handle POST request for user registration.
+
+        Implements guard clauses for early error returns:
+        1. Validate request data (email format, password strength, email uniqueness)
+        2. Register user via service layer
+        3. Serialize and return response
+        """
+        # Validate request data
+        serializer = RegisterUserSerializer(data=request.data)
+        if not serializer.is_valid():
+            logger.warning(
+                f"Invalid registration request: {serializer.errors}"
+            )
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Register user via service layer
+            email = serializer.validated_data['email']
+            password = serializer.validated_data['password']
+
+            user_data = register_user(email, password)
+
+            # Serialize response
+            response_serializer = RegisteredUserSerializer(user_data)
+
+            logger.info(f"Successfully registered user: {email}")
+
+            return Response(
+                response_serializer.data,
+                status=status.HTTP_201_CREATED
+            )
+
+        except IntegrityError as e:
+            # Handle race condition where user was created between validation and insertion
+            logger.warning(
+                f"Integrity error during registration: {str(e)}"
+            )
+            return Response(
+                {"email": ["A user with this email already exists"]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        except DatabaseError as e:
+            logger.error(
+                f"Database error during user registration: {str(e)}",
+                exc_info=True
+            )
+            return Response(
+                {"error": "An error occurred while creating your account. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Unexpected error during user registration: {str(e)}",
                 exc_info=True
             )
             return Response(

@@ -57,7 +57,9 @@ urlpatterns = [
     # User Profile (Authenticated)
     path("api/me/", views.UserProfileView.as_view(), name="user-profile"),
 
+    # User Registration (Public)
+    path("api/register/", views.RegisterView.as_view(), name="register"),
+
     # TODO: Implement these endpoints
-    # path("api/register/", views.RegisterView.as_view(), name="register"),
     # path("api/suggestions/", views.AISuggestionsView.as_view(), name="suggestions"),
 ]

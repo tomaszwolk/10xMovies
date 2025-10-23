@@ -70,7 +70,7 @@ Funkcjonalności rejestracji:
 - Rejestracja z wykorzystaniem adresu email i hasła
 - Walidacja formatu email
 - Wymagania dotyczące hasła (minimum 8 znaków, mix liter i cyfr)
-- Haszowanie haseł przez bcrypt z salt (minimum 10 rounds)
+- Haszowanie haseł PBKDF2 z salt (domyślne ustawienia Django)
 - Pole email_verified w bazie (dla przyszłej implementacji weryfikacji)
 
 Funkcjonalności logowania:
@@ -79,7 +79,7 @@ Funkcjonalności logowania:
 - Wylogowanie (usunięcie tokenów po stronie klienta)
 
 Bezpieczeństwo:
-- Bcrypt z minimum 10 rounds dla haszowania
+- PBKDF2 (domyślne ustawienia Django) dla haszowania
 - JSON Web Tokens (JWT) dla autentykacji API
 - Ochrona przed atakami brute-force
 - Brak funkcji "zapomniane hasło" w MVP (v1.1)
@@ -466,8 +466,8 @@ Kryteria akceptacji:
 - Walidacja hasła wymaga minimum 8 znaków, mix liter i cyfr
 - Pole "powtórz hasło" musi być identyczne z polem "hasło"
 - Komunikat błędu wyświetla się przy niepoprawnej walidacji
-- Po prawidłowej rejestracji hasło jest hashowane przez bcrypt (min 10 rounds)
-- Użytkownik jest automatycznie zalogowany po rejestracji
+- Po prawidłowej rejestracji hasło jest hashowane (PBKDF2)
+- Użytkownik NIE jest automatycznie zalogowany po rejestracji; loguje się przez endpoint /api/token/ (JWT)
 - Użytkownik jest przekierowany do procesu onboardingu
 - Pole email_verified jest ustawione na false w bazie danych
 
@@ -477,7 +477,7 @@ Jako zarejestrowany użytkownik chcę zalogować się do aplikacji, aby uzyskać
 Kryteria akceptacji:
 - System wyświetla formularz logowania z polami: email, hasło
 - System sprawdza czy email istnieje w bazie danych
-- System porównuje podane hasło z zahaszowanym hasłem w bazie (bcrypt)
+- System porównuje podane hasło z zahaszowanym hasłem w bazie
 - Komunikat błędu "Nieprawidłowy email lub hasło" przy błędnych danych
 - Po prawidłowym logowaniu użytkownik jest przekierowany do swojej watchlisty
 - Tokeny JWT (access i refresh) są generowane i zwracane klientowi

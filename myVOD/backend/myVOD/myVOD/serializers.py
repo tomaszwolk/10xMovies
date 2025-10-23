@@ -5,6 +5,8 @@ Custom serializers for myVOD project.
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from movies.models import Platform
 
 User = get_user_model()
@@ -20,7 +22,7 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     email = serializers.CharField(required=True)
     password = serializers.CharField(required=True)
-    username_field = User.EMAIL_FIELD
+    username_field = User.EMAIL_FIELD if hasattr(User, 'EMAIL_FIELD') else 'username'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -35,19 +37,17 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         email = attrs.get('email')
         password = attrs.get('password')
 
-        # Try to get user by email
+        # Authenticate using email; fallback to username if needed
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                'No active account found with the given credentials'
-            )
+            try:
+                user = User.objects.get(username=email)
+            except User.DoesNotExist:
+                raise serializers.ValidationError('No active account found with the given credentials')
 
-        # Verify password
         if not user.check_password(password):
-            raise serializers.ValidationError(
-                'No active account found with the given credentials'
-            )
+            raise serializers.ValidationError('No active account found with the given credentials')
 
         # Check if user is active
         if not user.is_active:
@@ -148,3 +148,98 @@ class UpdateUserProfileSerializer(serializers.Serializer):
             )
 
         return value
+
+
+class RegisterUserSerializer(serializers.Serializer):
+    """
+    Serializer for user registration request.
+
+    This maps to RegisterUserCommand on the frontend.
+    Validates email format and password strength requirements.
+
+    Request body for POST /api/register/
+
+    Password Requirements:
+        - Minimum 8 characters
+        - Must contain both letters and numbers
+        - Must not be too similar to user attributes
+        - Must not be a commonly used password
+    """
+    email = serializers.EmailField(
+        required=True,
+        help_text="User's email address (must be unique)"
+    )
+    password = serializers.CharField(
+        required=True,
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text="Password (minimum 8 characters, must contain letters and numbers)"
+    )
+
+    def validate_email(self, value):
+        """
+        Validate that email is unique.
+
+        Args:
+            value: Email address to validate
+
+        Returns:
+            Validated email address (normalized to lowercase)
+
+        Raises:
+            ValidationError: If email already exists
+        """
+        # Normalize email to lowercase for consistency
+        email = value.lower()
+
+        # Check if email already exists
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError(
+                "A user with this email already exists"
+            )
+
+        return email
+
+    def validate_password(self, value):
+        """
+        Validate password meets security requirements.
+
+        Uses Django's password validation framework to enforce:
+        - Minimum length (8 characters)
+        - Contains letters and numbers
+        - Not too similar to user attributes
+        - Not a commonly used password
+
+        Args:
+            value: Password to validate
+
+        Returns:
+            Validated password
+
+        Raises:
+            ValidationError: If password doesn't meet requirements
+        """
+        try:
+            # Use Django's password validators
+            # Note: We pass None for user since user doesn't exist yet
+            validate_password(value, user=None)
+        except DjangoValidationError as e:
+            # Convert Django ValidationError to DRF ValidationError
+            raise serializers.ValidationError(list(e.messages))
+
+        return value
+
+
+class RegisteredUserSerializer(serializers.Serializer):
+    """
+    Serializer for user registration response.
+
+    This maps to RegisteredUserDto on the frontend.
+    Returns only non-sensitive user information after successful registration.
+
+    Response for POST /api/register/
+    """
+    email = serializers.EmailField(
+        read_only=True,
+        help_text="Registered user's email address"
+    )
