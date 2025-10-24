@@ -71,6 +71,22 @@ def get_supabase_uuid(supabase: Client, django_user_id: int) -> str | None:
         return None
 
 
+def load_valid_tconsts(basics_path: Path) -> set[str]:
+    """Loads all tconst from title.basics.tsv into a set for quick lookup."""
+    tconsts = set()
+    try:
+        with open(basics_path, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f, delimiter='\t')
+            next(reader)  # Skip header
+            for row in reader:
+                if row and len(row) > 0:
+                    tconsts.add(row[0])
+        print(f"Loaded {len(tconsts)} valid tconsts from title.basics.tsv.")
+    except Exception as e:
+        print(f"Error loading title.basics.tsv: {e}")
+    return tconsts
+
+
 def get_movies_from_watchlist(watchlist_path: Path) -> list[str]:
     """Reads the IMDb watchlist CSV and returns a list of tconsts."""
     tconsts = []
@@ -132,10 +148,23 @@ def main():
 
     print(f"Found {len(watchlist_tconsts)} movies in '{WATCHLIST_FILENAME}'.")
 
-    # Check which of these movies already exist in our 'movie' table
-    existing_tconsts = filter_existing_movies(supabase, watchlist_tconsts)
+    # Filter tconsts to only those in title.basics.tsv
+    basics_path = IMDB_DATA_SET_LITE_DIR / 'title.basics.tsv'
+    valid_tconst_set = load_valid_tconsts(basics_path)
+    filtered_tconsts = [tconst for tconst in watchlist_tconsts if tconst in valid_tconst_set]
     
-    not_found_tconsts = set(watchlist_tconsts) - set(existing_tconsts)
+    if len(filtered_tconsts) < len(watchlist_tconsts):
+        skipped = len(watchlist_tconsts) - len(filtered_tconsts)
+        print(f"Skipped {skipped} movies not in title.basics.tsv.")
+
+    if not filtered_tconsts:
+        print("No valid movies found after filtering. Aborting.")
+        return
+
+    # Check which of these movies already exist in our 'movie' table
+    existing_tconsts = filter_existing_movies(supabase, filtered_tconsts)
+    
+    not_found_tconsts = set(filtered_tconsts) - set(existing_tconsts)
     if not_found_tconsts:
         print(f"Warning: {len(not_found_tconsts)} movies from the watchlist were not found in the 'movie' table and will be skipped.")
 
@@ -174,7 +203,7 @@ def main():
             # API response for upsert doesn't reliably tell us how many were inserted vs ignored.
             # We just confirm the call was successful.
             if response.data:
-                 total_upserted += len(response.data)
+                total_upserted += len(response.data)
 
         except Exception as e:
             print(f"An error occurred during batch upsert: {e}")

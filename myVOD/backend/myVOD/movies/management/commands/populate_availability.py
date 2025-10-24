@@ -87,6 +87,10 @@ class Command(BaseCommand):
         watchmode_id = title_data.get('id')
         imdb_id = title_data.get('imdb_id')
 
+        if title_data.get('type') != 'movie':
+            logger.info(f"Skipping non-movie title: {title_data.get('title')} (type: {title_data.get('type')})")
+            return
+
         if not watchmode_id or not imdb_id:
             return
 

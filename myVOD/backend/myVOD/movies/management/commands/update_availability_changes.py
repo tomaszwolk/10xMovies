@@ -72,6 +72,10 @@ class Command(BaseCommand):
             )
             return
 
+        if details.get('type') != 'movie':
+            logger.info(f"Skipping non-movie update: {details.get('title', 'Unknown')} (type: {details.get('type')})")
+            return
+
         # Get all platforms we track from DB
         platforms = {
             p.platform_name: p

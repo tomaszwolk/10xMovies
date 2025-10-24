@@ -21,6 +21,7 @@ from movies.models import (
     IntegrationErrorLog,
     Movie
 )
+from collections import Counter
 
 try:
     import google.generativeai as genai  # type: ignore
@@ -44,7 +45,7 @@ class RateLimitError(Exception):
     pass
 
 
-def get_or_generate_suggestions(user):
+def get_or_generate_suggestions(user, debug=False):
     """
     Get cached AI suggestions or generate new ones if needed.
 
@@ -54,9 +55,11 @@ def get_or_generate_suggestions(user):
         - One suggestion batch per calendar day (based on server timezone)
         - Cached suggestions valid until end of day (23:59:59)
         - Next suggestions available at start of next day (00:00:00)
+        - If debug=True, bypasses rate limiting and always generates new suggestions
 
     Args:
         user: Authenticated Django User instance
+        debug: If True, disables daily rate limiting for testing (default: False)
 
     Returns:
         dict: AI suggestions data with structure:
@@ -83,9 +86,12 @@ def get_or_generate_suggestions(user):
 
     Raises:
         InsufficientDataError: If user has no watchlist/watched movies
-        RateLimitError: If suggestions were already generated today
+        RateLimitError: If suggestions were already generated today (unless debug=True)
         DatabaseError: If database operation fails
     """
+    if debug:
+        logger.info(f"Debug mode enabled for user {user.email} - bypassing rate limiting")
+
     try:
         # Get current date (server timezone)
         now = timezone.now()
@@ -96,12 +102,14 @@ def get_or_generate_suggestions(user):
             datetime.combine(now.date(), time.max)
         )
 
-        # Check for cached suggestions from today
-        cached_batch = AiSuggestionBatch.objects.filter(
-            user_id=user.id,
-            generated_at__gte=today_start,
-            generated_at__lte=today_end
-        ).order_by('-generated_at').first()
+        # Check for cached suggestions from today (skip if debug)
+        cached_batch = None
+        if not debug:
+            cached_batch = AiSuggestionBatch.objects.filter(
+                user_id=user.id,
+                generated_at__gte=today_start,
+                generated_at__lte=today_end
+            ).order_by('-generated_at').first()
 
         if cached_batch:
             logger.info(
@@ -327,6 +335,51 @@ def _generate_mock_suggestions(user, user_movies, user_platform_ids, user_platfo
     return None
 
 
+def _analyze_user_preferences(user_movies, user_platforms):
+    """
+    Analyze user's movie preferences for diversity.
+    
+    Computes top 3 genres from watchlist + watched movies.
+    Suggests proportional platform distribution (max 2 per platform).
+    
+    Args:
+        user_movies: List of user movie dicts
+        user_platforms: List of UserPlatform instances
+    
+    Returns:
+        dict: {'top_genres': list[str], 'platform_distribution': dict[int, int]}
+    """
+    # Collect all genres from user's movies
+    all_genres = []
+    for movie in user_movies:
+        genres = movie.get('tconst__genres', [])
+        if genres:
+            all_genres.extend(genres)
+    
+    # Top 3 genres
+    genre_counts = Counter(all_genres)
+    top_genres = [genre for genre, _ in genre_counts.most_common(3)]
+    
+    num_platforms = len(user_platforms)
+    if num_platforms == 0:
+        platform_dist = {}
+    else:
+        # Proportional: e.g., 2 platforms -> 3+2; 5 -> 1 each
+        base = 5 // num_platforms
+        extra = 5 % num_platforms
+        platform_dist = {}
+        for i, up in enumerate(user_platforms):
+            count = base + (1 if i < extra else 0)
+            platform_dist[up.platform_id] = min(count, 2)  # Max 2 per platform
+    
+    logger.info(f"User preferences: Top genres {top_genres}, Platform dist {platform_dist}")
+    
+    return {
+        'top_genres': top_genres,
+        'platform_distribution': platform_dist
+    }
+
+
 def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform_names):
     """
     Generate AI-powered movie suggestions using Google Gemini.
@@ -389,18 +442,29 @@ def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform
             )
             return []
 
-        # Build prompt with user data and available movies
-        prompt = _build_gemini_prompt(watchlist, watched, available_movies, user_platform_names)
+        # Get user's platforms for analysis
+        user_platform_qs = UserPlatform.objects.filter(user_id=user.id).select_related('platform')
+        user_platforms = list(user_platform_qs)
+
+        # Analyze preferences for diversity
+        preferences = _analyze_user_preferences(user_movies, user_platforms)
+
+        # Build prompt with user data, available movies, and preferences
+        prompt = _build_gemini_prompt(
+            watchlist, watched, available_movies, user_platform_names, 
+            preferences['top_genres'], preferences['platform_distribution']
+        )
 
         logger.info(f"Prompt length: {len(prompt)} characters")
         logger.debug(f"Full prompt sent to Gemini:\n{prompt}")  # Use debug to avoid flooding logs
 
-        # Call Gemini API with timeout
+        # Call Gemini API with updated config for diversity
         response = model.generate_content(
             prompt,
             generation_config={  # type: ignore[arg-type]
-                'temperature': 0.7,
-                'max_output_tokens': 2000,
+                'temperature': 0.5,  # Lower for more consistent diversity
+                'top_k': 40,  # Limit to top 40 tokens for controlled creativity
+                'max_output_tokens': 2500,
                 'top_p': 0.9,
             },
             request_options={'timeout': 30}
@@ -511,22 +575,28 @@ def _get_available_movies_for_platforms(user_platform_ids, user_movies):
     return result
 
 
-def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_names):
+def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_names, top_genres, platform_dist):
     """
-    Build a detailed prompt for Gemini AI with user's movie context and available movies.
-    """
-    logger.info(f"Building prompt with {len(watchlist)} watchlist items, {len(watched)} watched, {len(available_movies)} available movies")
+    Build a detailed prompt for Gemini AI with user's movie context, available movies, and diversity preferences.
     
-    if available_movies:
-        available_tconsts = [m['tconst'] for m in available_movies]
-        logger.info(f"Available tconsts sample: {available_tconsts[:10]}")  # Log first 10
+    Args:
+        watchlist: List of user's current watchlist movies
+        watched: List of user's watched movies
+        available_movies: List of available movies on user's platforms
+        user_platform_names: List of user's subscribed platform names
+        top_genres: List of top 3 user genres
+        platform_dist: Dict of suggested counts per platform
+    """
+    logger.info(f"Building diverse prompt: top_genres={top_genres}, dist={platform_dist}")
 
     prompt_parts = [
         "You are an expert movie recommendation system. Your task is to suggest movies "
-        "that are CURRENTLY AVAILABLE on the user's VOD streaming platforms.",
+        "that are CURRENTLY AVAILABLE on the user's VOD streaming platforms with DIVERSITY.",
         "",
         "## User's Subscribed VOD Platforms:",
-        f"User has access to the following platforms: {', '.join(user_platform_names)}.",
+        f"User has access to: {', '.join(user_platform_names)}.",
+        f"Distribute suggestions proportionally: {platform_dist} (e.g., 3 from first, 2 from second). "
+        "Ensure at least one from each if possible. No more than 2 from same platform.",
         "",
         "## User's Current Watchlist (movies they plan to watch):"
     ]
@@ -588,20 +658,23 @@ def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_nam
 
     prompt_parts.extend([
         "",
-        "## Your Task:",
-        "Based on the user's taste and viewing history, suggest 5 movies they would likely enjoy from the available list.",
+        "## User's Top Genres (from watchlist + watched):",
+        f"Top 3: {', '.join(top_genres) if top_genres else 'N/A'}. "
+        "Structure suggestions: 3 from top genres (one per genre) + 1 popular outside top genres + 1 diverse surprise.",
+        "No more than 2 from same genre overall. Offer variety in sub-genres and years.",
         "",
-        "## CRITICAL REQUIREMENTS:",
-        "1. Choose ONLY from the 'Available Movies' list above - NO EXCEPTIONS",
-        "2. Match user's genre preferences from their watchlist and watched movies",
-        "3. You CAN suggest movies that are on their watchlist if they are in the available list - this helps them discover what they can watch NOW",
-        "4. Do NOT suggest movies they've already watched (check the watched list)",
-        "5. Prioritize well-rated movies (higher ratings)",
-        "6. Offer variety while staying within their preferences",
-        "7. Use the EXACT tconst ID from the available movies list - do not invent any",
-        "8. PRIORITIZE movies from their watchlist if available on platforms - they already want to see them!",
-        "9. At least two suggestions must be movies NOT on their watchlist (new discoveries)",
-        "10. If a movie is on watchlist AND available, mention that in justification",
+        "## Your Task:",
+        "Suggest 5 diverse movies from available list based on preferences.",
+        "",
+        "## CRITICAL DIVERSITY REQUIREMENTS:",
+        "1. ONLY from available list - NO EXCEPTIONS",
+        "2. 3 from top genres (one each: e.g., Action, Drama, Sci-Fi)",
+        "3. 1 popular movie outside top genres (high rating, different platform)",
+        "4. 1 surprise: Diverse, not on watchlist, from underrepresented platform",
+        "5. <=2 same genre/platform; proportional to {platform_dist}",
+        "6. Variety: Mix recent/classic, avoid all superheroes if possible",
+        "7. EXACT tconst from list",
+        "8. Mention genre/platform in justification if relevant",
         "",
         "## Response Format:",
         "Return ONLY a valid JSON array (no markdown, no code blocks, no explanatory text) "
@@ -614,14 +687,11 @@ def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_nam
         ']',
         "",
         "## Important Rules:",
-        "- tconst MUST be from the available movies list above - verify before suggesting",
-        "- justification MUST be under 200 characters and honest based on user's data",
-        "- Return exactly 5 suggestions (or fewer if not enough good matches from the list)",
-        "- If you cannot find 5 good matches from the list, return fewer",
-        "- Do NOT add any movies not in the available list",
-        "- Return ONLY the JSON array, nothing else",
+        "- Verify diversity before suggesting",
+        "- If can't meet exactly, prioritize top genres + platform balance",
+        "- ONLY JSON array",
         "",
-        "Generate the suggestions now:"
+        "Generate diverse suggestions now:"
     ])
 
     return "\n".join(prompt_parts)
@@ -685,7 +755,7 @@ def _parse_gemini_response(response_text):
 def _validate_suggestions(suggestions, user_movies, available_movies, user_platform_ids):
     """
     Validate suggestions from Gemini against database and user's movies.
-    Now includes availability check.
+    Now includes basic diversity check.
     """
     if not suggestions or not isinstance(suggestions, list):
         return []
@@ -760,8 +830,32 @@ def _validate_suggestions(suggestions, user_movies, available_movies, user_platf
             logger.warning(f"Error validating movie {tconst}: {str(e)}")
             continue
 
-    logger.info(f"Validated {len(validated)} out of {len(suggestions)} suggestions")
-    return validated
+    # Basic diversity check after validation
+    validated_genres = []
+    validated_platforms = Counter()
+    for sug in validated:
+        # Fetch genre for check (simplified: assume first genre from DB)
+        movie = Movie.objects.filter(tconst=sug['tconst']).values('genres').first()
+        genre = movie['genres'][0] if movie and movie['genres'] else 'Unknown'
+        validated_genres.append(genre)
+        
+        # Platform: from availability
+        avail = _get_movie_availability(sug['tconst'], user_platform_ids)
+        if avail:
+            plat_id = avail[0]['platform_id']  # First platform
+            validated_platforms[plat_id] += 1
+
+    genre_counts = Counter(validated_genres)
+    if any(count > 2 for count in genre_counts.values()):
+        logger.warning(f"Diversity violation: Genre {max(genre_counts, key=genre_counts.get)} appears {genre_counts.most_common(1)[0][1]} times >2")
+
+    plat_max = max(validated_platforms.values()) if validated_platforms else 0
+    if plat_max > 2:
+        logger.warning(f"Diversity violation: Platform max {plat_max} >2")
+
+    logger.info(f"Diversity check: Genres {dict(genre_counts)}, Platforms {dict(validated_platforms)}")
+    
+    return validated  # No reshuffle for MVP
 
 
 def _get_movie_availability(tconst, platform_ids):
@@ -810,39 +904,16 @@ def _get_movie_availability(tconst, platform_ids):
 def _log_integration_error(api_type, error_message, error_details=None, user_id=None):
     """
     Log integration error to database.
-
-    Args:
-        api_type: Type of API that failed (e.g., "gemini", "tmdb", "watchmode")
-        error_message: Error message from the API
-        error_details: Optional dict with additional error context
-        user_id: Optional user ID associated with the error
-
-    Returns:
-        IntegrationErrorLog: Created error log entry or None if failed
     """
     try:
-        # TEMPORARY: Log to logger instead of database due to partition issues
-        logger.error(
-            f"Integration error - {api_type}: {error_message}",
-            extra={
-                'api_type': api_type,
-                'error_details': error_details or {},
-                'user_id': str(user_id) if user_id else None
-            }
+        error_log = IntegrationErrorLog.objects.create(
+            api_type=api_type,
+            error_message=error_message,
+            error_details=error_details or {},
+            user_id=user_id,
+            occurred_at=timezone.now()
         )
-        
-        # TODO: Fix partition issue in integration_error_log table
-        # Uncomment when partitions are created for future dates
-        # error_log = IntegrationErrorLog.objects.create(
-        #     api_type=api_type,
-        #     error_message=error_message,
-        #     error_details=error_details or {},
-        #     user_id=user_id,
-        #     occurred_at=timezone.now()
-        # )
-        # return error_log
-        
-        return None
+        return error_log
 
     except Exception as e:
         # Don't let logging errors break the main flow

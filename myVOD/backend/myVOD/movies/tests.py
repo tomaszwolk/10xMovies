@@ -360,16 +360,21 @@ class ManagementCommandsTests(APITestCase):
         # Arrange
         platform_netflix, _ = Platform.objects.get_or_create(platform_slug='netflix', defaults={'platform_name': 'Netflix'})
         mock_service_instance = MockWatchmodeService.return_value
-        mock_service_instance.list_titles.return_value = {
-            'titles': [
-                {'id': 101, 'imdb_id': 'tt0111161', 'title': 'The Shawshank Redemption', 'year': 1994},
-                {'id': 102, 'imdb_id': 'tt0068646', 'title': 'The Godfather', 'year': 1972},
-            ],
+
+        mock_response = {
+            'titles': [{
+                'id': 12345,
+                'title': 'Test Movie',
+                'imdb_id': 'tt0111161',
+                'year': 1994,
+                'type': 'movie'  # Ensure type is movie
+            }],
             'total_pages': 1
         }
-        
+        mock_service_instance.list_titles.return_value = mock_response
+
         out = StringIO()
-        
+
         # Act
         call_command('populate_availability', 'netflix', stdout=out)
 
@@ -388,16 +393,19 @@ class ManagementCommandsTests(APITestCase):
             tconst='tt0133093', 
             defaults={'primary_title': 'The Matrix', 'watchmode_id': 201}
         )
-        
+
         mock_service_instance = MockWatchmodeService.return_value
         mock_service_instance.get_source_changes.return_value = {
             'titles': [201], # This is the watchmode_id
             'total_pages': 1
         }
-        mock_service_instance.get_title_details.return_value = {
-            'id': 201, 'sources': [{'name': 'Netflix'}]
+
+        mock_details = {
+            'sources': [{'name': 'Netflix'}],
+            'type': 'movie'  # Ensure type is movie
         }
-        
+        mock_service_instance.get_title_details.return_value = mock_details
+
         out = StringIO()
 
         # Act

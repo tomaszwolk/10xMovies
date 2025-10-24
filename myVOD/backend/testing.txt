@@ -28,6 +28,36 @@ public.auth_user.username = 'testuser'
 public.auth_user.email = 'test@example.com'
 public.auth_user.password = 'testpass123'
 auth.users.id = '2489b2a0-9037-44c6-ad71-5a0820fc2280'
+
+# Generowanie tokena dla testuser
+python manage.py shell
+"""
+from rest_framework_simplejwt.tokens import AccessToken
+import uuid
+
+# Tworzymy mock user object z UUID
+class MockUser:
+    id = uuid.UUID("2489b2a0-9037-44c6-ad71-5a0820fc2280")
+    is_active = True
+
+user = MockUser()
+
+# Generujemy token z UUID
+token = AccessToken()
+token['user_id'] = str(user.id)  # Użyj UUID jako string
+token['email'] = 'testuser@example.com'  # Opcjonalnie
+
+access_token = str(token)
+print("\n" + "="*60)
+print("ACCESS TOKEN (with UUID):")
+print("="*60)
+print(access_token)
+print("="*60 + "\n")
+"""
+curl -X GET http://localhost:8000/api/suggestions/?debug=true \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -v
 # ============================================
 # TEST GET /api/platforms/
 # ============================================

@@ -409,6 +409,8 @@ class AISuggestionsView(APIView):
     Generates or retrieves cached AI movie suggestions for the authenticated user.
     Rate limited to one suggestion batch per calendar day (server timezone).
 
+    Optional query parameter: debug=true to bypass daily rate limiting and always generate new suggestions for testing.
+
     Returns:
         200: AISuggestionsDto with suggestions and expiration time
         401: Missing or invalid authentication
@@ -437,7 +439,8 @@ class AISuggestionsView(APIView):
             "Rate limited to one request per calendar day (server timezone). "
             "Suggestions expire at the end of the day (23:59:59) and new suggestions "
             "can be requested starting from the next day (00:00:00). "
-            "Requires JWT authentication."
+            "Requires JWT authentication. "
+            "Optional query parameter: debug=true to bypass daily rate limiting for testing purposes."
         ),
         responses={
             200: AISuggestionsSerializer,
@@ -460,8 +463,11 @@ class AISuggestionsView(APIView):
         5. Serialize and return results
         """
         try:
+            # Parse debug parameter from query params
+            debug = request.query_params.get('debug', 'false').lower() == 'true'
+
             # Get or generate suggestions via service layer
-            suggestions_data = get_or_generate_suggestions(request.user)
+            suggestions_data = get_or_generate_suggestions(request.user, debug=debug)
 
             # Serialize response
             serializer = AISuggestionsSerializer(suggestions_data)
