@@ -4,7 +4,7 @@ Serializers for movies app.
 This module contains serializers for movie-related API endpoints.
 """
 from rest_framework import serializers
-from .models import Movie
+from .models import Movie, MovieAvailability, Platform
 
 
 class MovieSearchQueryParamsSerializer(serializers.Serializer):
@@ -27,6 +27,20 @@ class MovieSearchQueryParamsSerializer(serializers.Serializer):
     )
 
 
+class PlatformSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Platform
+        fields = ['platform_slug', 'platform_name']
+
+
+class MovieAvailabilitySerializer(serializers.ModelSerializer):
+    platform = PlatformSerializer(read_only=True)
+
+    class Meta:
+        model = MovieAvailability
+        fields = ['platform', 'is_available', 'last_checked', 'source', 'details']
+
+
 class MovieSearchResultSerializer(serializers.ModelSerializer):
     """
     Serializer for movie search results.
@@ -40,12 +54,14 @@ class MovieSearchResultSerializer(serializers.ModelSerializer):
         - start_year: Release year
         - avg_rating: Average rating (converted to string for API consistency)
         - poster_path: URL to movie poster
+        - availability: List of VOD platforms where the movie is available
     """
     avg_rating = serializers.SerializerMethodField()
+    availability = MovieAvailabilitySerializer(many=True, read_only=True, source='availability_entries')
 
     class Meta:
         model = Movie
-        fields = ['tconst', 'primary_title', 'start_year', 'avg_rating', 'poster_path']
+        fields = ['tconst', 'primary_title', 'start_year', 'avg_rating', 'poster_path', 'availability']
 
     def get_avg_rating(self, obj):
         """

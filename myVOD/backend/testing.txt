@@ -1,4 +1,11 @@
 cd myVOD/backend/myVOD
+
+# Import o database from Watchmode API
+python backend/manage.py populate_availability [nazwa_platformy_1] [nazwa_platformy_2]
+    # example python backend/manage.py populate_availability netflix primevideo
+# For getting only last changes in Watchmode API
+python backend/manage.py update_availability_changes
+
 # all
 python manage.py test --verbosity 2
 

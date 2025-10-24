@@ -200,7 +200,7 @@ The following PostgreSQL extensions need to be enabled:
   - `ai_suggestion_batch` records will be deleted 30 days after `expires_at`.
 - **Soft Deletes**: The `user_movie` table uses a `watchlist_deleted_at` timestamp for soft-deleting items from a user's watchlist, preserving history.
 - **Region**: All availability data is for the 'PL' (Poland) region in the MVP. This is handled in the application logic, not with a dedicated column.
-- **External ID Mapping**: Mappings between our platform IDs and external service IDs (Watchmode, TMDB) are managed in the Django application's settings, not in the database.
+- **External ID Mapping**: Mappings between external service names (e.g., Watchmode's "HBO Max") and internal `platform_slug` values (e.g., "hbomax") are managed in the Django `settings.py` file under the `VOD_PLATFORMS` dictionary. This allows for flexible integration without hardcoding values in the business logic.
 
 ---
 

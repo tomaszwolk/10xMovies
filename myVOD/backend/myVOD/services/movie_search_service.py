@@ -71,7 +71,7 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
             '-similarity',
             '-avg_rating',
             '-start_year'
-        )[:limit]
+        ).prefetch_related('availability_entries')[:limit]
 
         result_count = queryset.count()
         logger.info(f"Found {result_count} movies matching query '{search_query}' (accent-insensitive)")
@@ -95,7 +95,7 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
             '-similarity',
             '-avg_rating',
             '-start_year'
-        )[:limit]
+        ).prefetch_related('availability_entries')[:limit]
 
         # Don't count again if DB might still not support trigram; but we attempt for logging
         try:

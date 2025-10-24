@@ -21,6 +21,8 @@ from movies.models import (
     IntegrationErrorLog,
     Movie
 )
+from services.watchmode_service import WatchmodeService
+
 
 try:
     import google.generativeai as genai  # type: ignore
@@ -176,20 +178,23 @@ def _format_cached_suggestions(user, cached_batch):
     suggestions = cached_batch.response or []
 
     # Get user's selected platforms
-    user_platform_ids = list(
+    user_platforms = list(
         UserPlatform.objects.filter(user_id=user.id)
-        .values_list('platform_id', flat=True)
+        .select_related('platform')
     )
+    user_platform_ids = [up.platform_id for up in user_platforms]
+    suggestion_tconsts = [s.get('tconst') for s in suggestions if s.get('tconst')]
 
-    # Enrich suggestions with availability data
+    # Enrich suggestions with availability data in a single query
+    all_availability = _get_bulk_movie_availability(suggestion_tconsts, user_platform_ids)
+
     enriched_suggestions = []
     for suggestion in suggestions:
         tconst = suggestion.get('tconst')
         if not tconst:
             continue
 
-        # Get availability for user's platforms
-        availability = _get_movie_availability(tconst, user_platform_ids)
+        availability = all_availability.get(tconst, [])
 
         enriched_suggestions.append({
             'tconst': tconst,
@@ -237,18 +242,21 @@ def _generate_new_suggestions(user, expires_at):
             )[:50]  # Limit for API call
 
             # Get user's platforms
-            user_platform_ids = list(
+            user_platforms = list(
                 UserPlatform.objects.filter(user_id=user.id)
-                .values_list('platform_id', flat=True)
+                .select_related('platform')
             )
+            user_platform_ids = [up.platform_id for up in user_platforms]
+            user_platform_names = [up.platform.platform_name for up in user_platforms]
 
             # Generate AI suggestions with error handling
             try:
-                # Call Gemini AI integration
-                suggestions_data = _generate_mock_suggestions(
+                # This is no longer a mock, but the real implementation
+                suggestions_data = _generate_ai_suggestions(
                     user,
                     user_movies,
-                    user_platform_ids
+                    user_platform_ids,
+                    user_platform_names
                 )
 
                 logger.info(
@@ -302,38 +310,13 @@ def _generate_new_suggestions(user, expires_at):
         raise
 
 
-def _generate_mock_suggestions(user, user_movies, user_platform_ids):
+def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform_names):
     """
     Generate AI-powered movie suggestions using Google Gemini.
 
     This function calls the Gemini API to get personalized movie recommendations
     based on the user's watchlist, watched history, and movies available on their
-    subscribed VOD platforms.
-
-    Args:
-        user: Authenticated Django User instance
-        user_movies: QuerySet of user's movies with related Movie data
-        user_platform_ids: List of platform IDs user subscribes to
-
-    Returns:
-        list: List of suggestions in format:
-            [
-                {
-                    "tconst": str,  # IMDb ID (e.g., "tt0468569")
-                    "justification": str  # Recommendation reason (max 200 chars)
-                },
-                ...
-            ]
-            Returns empty list if Gemini is unavailable or on error.
-
-    Note:
-        - Recommends ONLY movies available on user's subscribed platforms
-        - Can recommend movies from watchlist (helps users see what's available NOW)
-        - Does NOT recommend already watched movies
-        - All errors are caught and logged to IntegrationErrorLog
-        - Returns empty list on failure (does not raise exceptions)
-        - Validates all tconst IDs against Movie database
-        - Maximum 5 suggestions returned
+    subscribed VOD platforms from our local database.
     """
     # Check if Gemini is available
     if not GEMINI_AVAILABLE:
@@ -361,8 +344,8 @@ def _generate_mock_suggestions(user, user_movies, user_platform_ids):
 
     try:
         # Configure Gemini API
-        genai.configure(api_key=settings.GEMINI_API_KEY)  # type: ignore
-        model = genai.GenerativeModel('gemini-1.5-flash')  # type: ignore
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         # Prepare user context
         watchlist = [
@@ -374,7 +357,7 @@ def _generate_mock_suggestions(user, user_movies, user_platform_ids):
             if m.get('watched_at')
         ]
 
-        # Get available movies on user's platforms
+        # Get available movies on user's platforms from our local DB
         available_movies = _get_available_movies_for_platforms(
             user_platform_ids,
             user_movies
@@ -382,25 +365,25 @@ def _generate_mock_suggestions(user, user_movies, user_platform_ids):
 
         if not available_movies:
             logger.warning(
-                f"No movies available on user {user.email}'s platforms - "
+                f"No movies available in local DB for user {user.email}'s platforms - "
                 f"cannot generate suggestions"
             )
             return []
 
         # Build prompt with user data and available movies
-        prompt = _build_gemini_prompt(watchlist, watched, available_movies, user_platform_ids)
+        prompt = _build_gemini_prompt(watchlist, watched, available_movies, user_platform_names)
 
         logger.debug(f"Calling Gemini API with prompt length: {len(prompt)} chars")
 
         # Call Gemini API with timeout
         response = model.generate_content(
             prompt,
-            generation_config={  # type: ignore
+            generation_config={
                 'temperature': 0.7,
                 'max_output_tokens': 2000,
                 'top_p': 0.9,
             },
-            request_options={'timeout': 30}  # type: ignore
+            request_options={'timeout': 30}
         )
 
         # Parse and validate response
@@ -434,8 +417,8 @@ def _generate_mock_suggestions(user, user_movies, user_platform_ids):
                 "user_email": user.email,
                 "user_movies_count": len(user_movies),
                 "error_type": type(e).__name__,
-                "watchlist_count": len([m for m in user_movies if m.get('watchlisted_at')]),
-                "watched_count": len([m for m in user_movies if m.get('watched_at')])
+                "watchlist_count": len(watchlist),
+                "watched_count": len(watched)
             },
             user_id=user.id
         )
@@ -514,7 +497,7 @@ def _get_available_movies_for_platforms(user_platform_ids, user_movies):
     return result
 
 
-def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_ids):
+def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_names):
     """
     Build a detailed prompt for Gemini AI with user's movie context and available movies.
 
@@ -522,7 +505,7 @@ def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_ids
         watchlist: List of movie dicts from user's watchlist (not yet watched)
         watched: List of movie dicts user has already watched
         available_movies: List of movies available on user's VOD platforms
-        user_platform_ids: List of platform IDs (currently unused but kept for future)
+        user_platform_names: List of platform names user subscribes to
 
     Returns:
         str: Formatted prompt for Gemini API
@@ -532,7 +515,7 @@ def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_ids
         "that are CURRENTLY AVAILABLE on the user's VOD streaming platforms.",
         "",
         "## User's Subscribed VOD Platforms:",
-        f"User has access to {len(user_platform_ids)} streaming platform(s).",
+        f"User has access to the following platforms: {', '.join(user_platform_names)}.",
         "",
         "## User's Current Watchlist (movies they plan to watch):"
     ]
@@ -767,13 +750,14 @@ def _validate_suggestions(suggestions, user_movies):
     return validated
 
 
-def _get_movie_availability(tconst, platform_ids):
+def _get_movie_availability(tconst, platform_ids, user_platforms):
     """
     Get movie availability on specified platforms.
 
     Args:
         tconst: Movie IMDb identifier
         platform_ids: List of platform IDs to check
+        user_platforms: List of UserPlatform objects for platform names
 
     Returns:
         list: Availability information for each platform:
@@ -845,3 +829,32 @@ def _log_integration_error(api_type, error_message, error_details=None, user_id=
             f"Failed to log integration error: {str(e)}",
             exc_info=True
         )
+
+
+def _get_bulk_movie_availability(tconsts, platform_ids):
+    """
+    Get movie availability for multiple movies on specified platforms in a single query.
+    """
+    if not platform_ids or not tconsts:
+        return {}
+
+    availability_data = MovieAvailability.objects.filter(
+        tconst__in=tconsts,
+        platform_id__in=platform_ids,
+        is_available=True
+    ).select_related('platform').values(
+        'tconst',
+        'platform_id',
+        'platform__platform_name'
+    )
+
+    # Group results by tconst
+    results = {tconst: [] for tconst in tconsts}
+    for item in availability_data:
+        results[item['tconst']].append({
+            'platform_id': item['platform_id'],
+            'platform_name': item['platform__platform_name'],
+            'is_available': True
+        })
+    
+    return results

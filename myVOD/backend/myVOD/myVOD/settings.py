@@ -212,3 +212,24 @@ SPECTACULAR_SETTINGS = {
 
 # Google Gemini AI Configuration
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
+# Watchmode API Configuration
+WATCHMODE_API_KEY = os.getenv('WATCHMODE_API_KEY')
+
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
+# VOD Platform Configuration
+# Mapping from Watchmode source name to internal platform slug
+VOD_PLATFORMS = {
+    'Netflix': 'netflix',
+    'HBO Max': 'hbomax',
+    'Disney+': 'disneyplus',
+    'Prime Video': 'primevideo',
+    'Apple TV+': 'appletvplus',
+}

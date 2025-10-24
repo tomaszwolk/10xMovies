@@ -6,7 +6,7 @@ Tests the full request-response cycle for movie-related endpoints.
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
-from movies.models import Movie  # type: ignore
+from movies.models import Movie, Platform, MovieAvailability  # type: ignore
 from django.db import DatabaseError
 from unittest.mock import patch
 
@@ -29,6 +29,10 @@ class MovieSearchAPITests(APITestCase):
 
         Creates a diverse set of movies to test search functionality.
         """
+        # Create test platforms
+        cls.platform_netflix = Platform.objects.create(platform_slug='netflix', platform_name='Netflix')
+        cls.platform_hbo = Platform.objects.create(platform_slug='hbomax', platform_name='HBO Max')
+        
         # Create test movies with unique tconst and titles to avoid collisions with real IMDB data
         cls.movie1 = Movie.objects.create(
             tconst="tt9980001",
@@ -66,6 +70,22 @@ class MovieSearchAPITests(APITestCase):
             poster_path="https://image.tmdb.org/t/p/w500/test5.jpg"
         )
 
+        # Create movie availability data
+        MovieAvailability.objects.create(
+            tconst=cls.movie2,
+            platform=cls.platform_netflix,
+            is_available=True,
+            last_checked='2025-10-23T12:00:00Z',
+            source='watchmode'
+        )
+        MovieAvailability.objects.create(
+            tconst=cls.movie2,
+            platform=cls.platform_hbo,
+            is_available=False,
+            last_checked='2025-10-23T12:00:00Z',
+            source='watchmode'
+        )
+
     def test_search_success_with_results(self):
         """Test successful search that returns results."""
         url = reverse('movie-search')
@@ -94,6 +114,7 @@ class MovieSearchAPITests(APITestCase):
         self.assertIn('start_year', first_movie)
         self.assertIn('avg_rating', first_movie)
         self.assertIn('poster_path', first_movie)
+        self.assertIn('availability', first_movie)
 
         # Verify field types
         self.assertIsInstance(first_movie['tconst'], str)
@@ -108,6 +129,16 @@ class MovieSearchAPITests(APITestCase):
         self.assertTrue(
             isinstance(first_movie['poster_path'], str) or first_movie['poster_path'] is None
         )
+        self.assertIsInstance(first_movie['availability'], list)
+
+        # Check availability structure
+        if first_movie['availability']:
+            availability_item = first_movie['availability'][0]
+            self.assertIn('platform', availability_item)
+            self.assertIn('is_available', availability_item)
+            self.assertIsInstance(availability_item['platform'], dict)
+            self.assertIsInstance(availability_item['is_available'], bool)
+            self.assertIn('platform_slug', availability_item['platform'])
 
     def test_search_avg_rating_as_string(self):
         """Test that avg_rating is returned as string, not decimal."""
