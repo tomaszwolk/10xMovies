@@ -364,7 +364,7 @@ def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform
     try:
         # Configure Gemini API
         genai.configure(api_key=settings.GEMINI_API_KEY)  # type: ignore[attr-defined]
-        model = genai.GenerativeModel('gemini-1.5-flash')  # type: ignore[attr-defined]
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')  # type: ignore[attr-defined]
 
         # Prepare user context
         watchlist = [
@@ -392,7 +392,8 @@ def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform
         # Build prompt with user data and available movies
         prompt = _build_gemini_prompt(watchlist, watched, available_movies, user_platform_names)
 
-        logger.debug(f"Calling Gemini API with prompt length: {len(prompt)} chars")
+        logger.info(f"Prompt length: {len(prompt)} characters")
+        logger.debug(f"Full prompt sent to Gemini:\n{prompt}")  # Use debug to avoid flooding logs
 
         # Call Gemini API with timeout
         response = model.generate_content(
@@ -405,6 +406,8 @@ def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform
             request_options={'timeout': 30}
         )
 
+        logger.info(f"Raw Gemini response: {response.text[:500]}...")  # Log first 500 chars
+
         # Parse and validate response
         suggestions = _parse_gemini_response(response.text)
 
@@ -415,7 +418,7 @@ def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform
             return []
 
         # Validate tconst IDs against database
-        valid_suggestions = _validate_suggestions(suggestions, user_movies)
+        valid_suggestions = _validate_suggestions(suggestions, user_movies, available_movies, user_platform_ids)
 
         logger.info(
             f"Successfully generated {len(valid_suggestions)} AI suggestions "
@@ -447,26 +450,12 @@ def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform
 def _get_available_movies_for_platforms(user_platform_ids, user_movies):
     """
     Get movies available on user's subscribed VOD platforms.
-
-    Queries MovieAvailability to find movies that are available (is_available=True)
-    on the user's platforms, excluding only movies already watched.
-
-    Movies on watchlist are INCLUDED - this helps users discover which movies
-    from their wishlist are currently available to watch.
-
-    Args:
-        user_platform_ids: List of platform IDs user subscribes to
-        user_movies: QuerySet of user's current movies
-
-    Returns:
-        list: Available movies with details, limited to 100 most popular
     """
     if not user_platform_ids:
+        logger.warning("No user_platform_ids provided")
         return []
 
     # Get set of watched movie tconst IDs to exclude
-    # NOTE: We intentionally DON'T exclude watchlisted movies - AI should be able
-    # to recommend movies from watchlist that are available on user's platforms
     watched_tconsts = set()
     for movie in user_movies:
         if movie.get('watched_at'):  # Only exclude actually watched movies
@@ -474,8 +463,9 @@ def _get_available_movies_for_platforms(user_platform_ids, user_movies):
             if tconst:
                 watched_tconsts.add(tconst)
 
+    logger.info(f"Excluding {len(watched_tconsts)} watched movies for platforms: {user_platform_ids}")
+
     # Query movies available on user's platforms
-    # Exclude only watched movies (watchlisted movies are OK to recommend)
     available_movies = MovieAvailability.objects.filter(
         platform_id__in=user_platform_ids,
         is_available=True
@@ -496,6 +486,8 @@ def _get_available_movies_for_platforms(user_platform_ids, user_movies):
         '-tconst__avg_rating'
     )[:100]  # Limit to top 100 to keep prompt size reasonable
 
+    logger.info(f"Query returned {len(available_movies)} available movies")
+
     # Group by tconst and aggregate platform names
     movies_dict = {}
     for item in available_movies:
@@ -512,23 +504,23 @@ def _get_available_movies_for_platforms(user_platform_ids, user_movies):
         movies_dict[tconst]['platforms'].append(item['platform__platform_name'])
 
     result = list(movies_dict.values())
-    logger.info(f"Found {len(result)} available movies across {len(user_platform_ids)} platforms")
+    if result:
+        sample_tconsts = [m['tconst'] for m in result[:5]]
+        logger.info(f"Sample available tconsts: {sample_tconsts}")
+    logger.info(f"Final available movies count: {len(result)} across {len(user_platform_ids)} platforms")
     return result
 
 
 def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_names):
     """
     Build a detailed prompt for Gemini AI with user's movie context and available movies.
-
-    Args:
-        watchlist: List of movie dicts from user's watchlist (not yet watched)
-        watched: List of movie dicts user has already watched
-        available_movies: List of movies available on user's VOD platforms
-        user_platform_names: List of platform names user subscribes to
-
-    Returns:
-        str: Formatted prompt for Gemini API
     """
+    logger.info(f"Building prompt with {len(watchlist)} watchlist items, {len(watched)} watched, {len(available_movies)} available movies")
+    
+    if available_movies:
+        available_tconsts = [m['tconst'] for m in available_movies]
+        logger.info(f"Available tconsts sample: {available_tconsts[:10]}")  # Log first 10
+
     prompt_parts = [
         "You are an expert movie recommendation system. Your task is to suggest movies "
         "that are CURRENTLY AVAILABLE on the user's VOD streaming platforms.",
@@ -571,7 +563,8 @@ def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_nam
         "",
         "## Available Movies on User's Platforms:",
         f"Here are {len(available_movies)} movies currently available on the user's streaming platforms.",
-        "You MUST choose suggestions ONLY from this list:",
+        "CRITICAL: You MUST choose suggestions ONLY from this exact list below. Do NOT suggest any other movies. Do NOT hallucinate tconst IDs.",
+        "Every suggested movie's tconst MUST appear in this list.",
         ""
     ])
 
@@ -591,38 +584,41 @@ def _build_gemini_prompt(watchlist, watched, available_movies, user_platform_nam
         )
 
     if len(available_movies) > 50:
-        prompt_parts.append(f"... and {len(available_movies) - 50} more movies available")
+        prompt_parts.append(f"... and {len(available_movies) - 50} more movies available. But ONLY use tconsts from the full list (you have all of them).")
 
     prompt_parts.extend([
         "",
         "## Your Task:",
-        "Based on the user's taste and viewing history, suggest 5 movies they would likely enjoy.",
+        "Based on the user's taste and viewing history, suggest 5 movies they would likely enjoy from the available list.",
         "",
         "## CRITICAL REQUIREMENTS:",
-        "1. Choose ONLY from the 'Available Movies' list above",
+        "1. Choose ONLY from the 'Available Movies' list above - NO EXCEPTIONS",
         "2. Match user's genre preferences from their watchlist and watched movies",
-        "3. You CAN suggest movies that are on their watchlist - this helps them discover what they can watch NOW",
-        "4. Do NOT suggest movies they've already watched",
+        "3. You CAN suggest movies that are on their watchlist if they are in the available list - this helps them discover what they can watch NOW",
+        "4. Do NOT suggest movies they've already watched (check the watched list)",
         "5. Prioritize well-rated movies (higher ratings)",
         "6. Offer variety while staying within their preferences",
-        "7. Use the exact tconst ID from the available movies list",
-        "8. PRIORITIZE movies from their watchlist if available - they already want to see them!",
-        "9. At least two suggestions must be outside of their watchlist",
+        "7. Use the EXACT tconst ID from the available movies list - do not invent any",
+        "8. PRIORITIZE movies from their watchlist if available on platforms - they already want to see them!",
+        "9. At least two suggestions must be movies NOT on their watchlist (new discoveries)",
+        "10. If a movie is on watchlist AND available, mention that in justification",
         "",
         "## Response Format:",
         "Return ONLY a valid JSON array (no markdown, no code blocks, no explanatory text) "
         "with this exact structure:",
         '[',
         '  {',
-        '    "tconst": "tt0468569",',
-        '    "justification": "Brief reason why this movie fits their taste (max 200 characters)"',
+        '    "tconst": "tt0468569",  // MUST be from available list',
+        '    "justification": "Brief reason why this movie fits their taste (max 200 characters). If on watchlist, mention it."',
         '  }',
         ']',
         "",
         "## Important Rules:",
-        "- tconst MUST be from the available movies list above",
-        "- justification MUST be under 200 characters",
-        "- Return exactly 5 suggestions (or fewer if not enough matches)",
+        "- tconst MUST be from the available movies list above - verify before suggesting",
+        "- justification MUST be under 200 characters and honest based on user's data",
+        "- Return exactly 5 suggestions (or fewer if not enough good matches from the list)",
+        "- If you cannot find 5 good matches from the list, return fewer",
+        "- Do NOT add any movies not in the available list",
         "- Return ONLY the JSON array, nothing else",
         "",
         "Generate the suggestions now:"
@@ -686,34 +682,24 @@ def _parse_gemini_response(response_text):
     return []
 
 
-def _validate_suggestions(suggestions, user_movies):
+def _validate_suggestions(suggestions, user_movies, available_movies, user_platform_ids):
     """
     Validate suggestions from Gemini against database and user's movies.
-
-    Checks:
-    - tconst format is valid (ttXXXXXXX)
-    - tconst exists in Movie database
-    - Movie is not already watched (watchlisted movies are OK)
-    - Justification exists and is under 200 characters
-
-    Args:
-        suggestions: List of suggestion dicts from Gemini
-        user_movies: QuerySet of user's current movies
-
-    Returns:
-        list: Validated and enriched suggestions
+    Now includes availability check.
     """
     if not suggestions or not isinstance(suggestions, list):
         return []
 
     # Get set of watched movie tconst IDs to avoid suggesting them
-    # NOTE: Watchlisted movies are intentionally NOT excluded
     watched_tconsts = set()
     for movie in user_movies:
         if movie.get('watched_at'):  # Only exclude watched movies
             tconst = movie.get('tconst__tconst')
             if tconst:
                 watched_tconsts.add(tconst)
+
+    # Get set of available tconsts for quick lookup
+    available_tconsts = {m['tconst'] for m in available_movies}
 
     validated = []
     tconst_pattern = re.compile(r'^tt\d{7,}$')
@@ -725,6 +711,8 @@ def _validate_suggestions(suggestions, user_movies):
         tconst = suggestion.get('tconst', '').strip()
         justification = suggestion.get('justification', '').strip()
 
+        logger.info(f"Validating suggestion tconst: {tconst}, justification: {justification[:100]}...")
+
         # Validate tconst format
         if not tconst or not tconst_pattern.match(tconst):
             logger.debug(f"Invalid tconst format: {tconst}")
@@ -733,6 +721,11 @@ def _validate_suggestions(suggestions, user_movies):
         # Check if already watched (skip if already watched)
         if tconst in watched_tconsts:
             logger.debug(f"Skipping {tconst} - already watched by user")
+            continue
+
+        # Check if available on user's platforms
+        if tconst not in available_tconsts:
+            logger.warning(f"Skipping {tconst} - not available on user's platforms")
             continue
 
         # Validate justification
@@ -760,6 +753,8 @@ def _validate_suggestions(suggestions, user_movies):
                 'start_year': movie['start_year'],
                 'justification': justification
             })
+
+            logger.info(f"Validated suggestion: {tconst} - {movie['primary_title']}")
 
         except Exception as e:
             logger.warning(f"Error validating movie {tconst}: {str(e)}")
@@ -823,23 +818,31 @@ def _log_integration_error(api_type, error_message, error_details=None, user_id=
         user_id: Optional user ID associated with the error
 
     Returns:
-        IntegrationErrorLog: Created error log entry
+        IntegrationErrorLog: Created error log entry or None if failed
     """
     try:
-        error_log = IntegrationErrorLog.objects.create(
-            api_type=api_type,
-            error_message=error_message,
-            error_details=error_details or {},
-            user_id=user_id,
-            occurred_at=timezone.now()
+        # TEMPORARY: Log to logger instead of database due to partition issues
+        logger.error(
+            f"Integration error - {api_type}: {error_message}",
+            extra={
+                'api_type': api_type,
+                'error_details': error_details or {},
+                'user_id': str(user_id) if user_id else None
+            }
         )
-
-        logger.warning(
-            f"Logged integration error: {api_type} - {error_message} "
-            f"(log_id={error_log.id})"
-        )
-
-        return error_log
+        
+        # TODO: Fix partition issue in integration_error_log table
+        # Uncomment when partitions are created for future dates
+        # error_log = IntegrationErrorLog.objects.create(
+        #     api_type=api_type,
+        #     error_message=error_message,
+        #     error_details=error_details or {},
+        #     user_id=user_id,
+        #     occurred_at=timezone.now()
+        # )
+        # return error_log
+        
+        return None
 
     except Exception as e:
         # Don't let logging errors break the main flow

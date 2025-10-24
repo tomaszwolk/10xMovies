@@ -149,7 +149,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     # Authentication (JWT for production, Session for tests/browsable API)
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "myVOD.authentication.UUIDJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     # Permissions (can be overridden per view)

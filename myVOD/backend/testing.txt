@@ -21,6 +21,13 @@ python manage.py test services.tests.test_ai_suggestions_service
 python manage.py test services.tests.test_watchmode_service -v 2
 python manage.py test services.tests.test_ai_suggestions_service
 
+
+# test user
+public.auth_user.id = 46
+public.auth_user.username = 'testuser'
+public.auth_user.email = 'test@example.com'
+public.auth_user.password = 'testpass123'
+auth.users.id = '2489b2a0-9037-44c6-ad71-5a0820fc2280'
 # ============================================
 # TEST GET /api/platforms/
 # ============================================
