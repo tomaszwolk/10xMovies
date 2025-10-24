@@ -5,6 +5,7 @@ This module contains business logic for searching movies in the database.
 """
 import logging
 import unicodedata
+from django.db import connection
 from django.db.models import QuerySet, F
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db.models.functions import Lower
@@ -50,6 +51,13 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
     logger.info(f"Searching for movies with query: '{search_query}'")
 
     try:
+        # Ensure the database connection is open and usable
+        try:
+            connection.ensure_connection()
+        except Exception:
+            # If ensure_connection fails, let the outer try/except handle fallback
+            pass
+
         # Try accent-insensitive search using immutable_unaccent on the column
         # and Python-side accent removal for the query string to match behavior.
         title_expr = Lower(

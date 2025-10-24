@@ -21,8 +21,6 @@ from movies.models import (
     IntegrationErrorLog,
     Movie
 )
-from services.watchmode_service import WatchmodeService
-
 
 try:
     import google.generativeai as genai  # type: ignore
@@ -177,12 +175,11 @@ def _format_cached_suggestions(user, cached_batch):
     # TODO: Implement actual AI integration and parsing
     suggestions = cached_batch.response or []
 
-    # Get user's selected platforms
-    user_platforms = list(
+    # Get user's selected platform IDs
+    user_platform_ids = list(
         UserPlatform.objects.filter(user_id=user.id)
-        .select_related('platform')
+        .values_list('platform_id', flat=True)
     )
-    user_platform_ids = [up.platform_id for up in user_platforms]
     suggestion_tconsts = [s.get('tconst') for s in suggestions if s.get('tconst')]
 
     # Enrich suggestions with availability data in a single query
@@ -242,22 +239,31 @@ def _generate_new_suggestions(user, expires_at):
             )[:50]  # Limit for API call
 
             # Get user's platforms
-            user_platforms = list(
-                UserPlatform.objects.filter(user_id=user.id)
-                .select_related('platform')
-            )
-            user_platform_ids = [up.platform_id for up in user_platforms]
-            user_platform_names = [up.platform.platform_name for up in user_platforms]
+            user_platform_qs = UserPlatform.objects.filter(user_id=user.id).select_related('platform')
+            user_platform_ids = list(user_platform_qs.values_list('platform_id', flat=True))
+            user_platform_names = [up.platform.platform_name for up in user_platform_qs]
 
             # Generate AI suggestions with error handling
             try:
-                # This is no longer a mock, but the real implementation
-                suggestions_data = _generate_ai_suggestions(
+                # First, allow tests to hook into a mock generator if patched.
+                # If it returns None, fall back to the real AI implementation.
+                mock_result = _generate_mock_suggestions(
                     user,
                     user_movies,
                     user_platform_ids,
                     user_platform_names
                 )
+
+                if mock_result is not None:
+                    suggestions_data = mock_result
+                else:
+                    # Real implementation
+                    suggestions_data = _generate_ai_suggestions(
+                        user,
+                        user_movies,
+                        user_platform_ids,
+                        user_platform_names
+                    )
 
                 logger.info(
                     f"Successfully generated AI suggestions for user {user.email}"
@@ -310,6 +316,17 @@ def _generate_new_suggestions(user, expires_at):
         raise
 
 
+def _generate_mock_suggestions(user, user_movies, user_platform_ids, user_platform_names):
+    """
+    Test hook to allow unit/integration tests to patch and simulate AI behavior.
+
+    By default returns None to indicate no mock behavior.
+    Tests can patch this function to return a list of suggestions or raise
+    an exception to exercise error handling and logging paths.
+    """
+    return None
+
+
 def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform_names):
     """
     Generate AI-powered movie suggestions using Google Gemini.
@@ -342,10 +359,12 @@ def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform
         f"based on {len(user_movies)} movies and {len(user_platform_ids)} platforms"
     )
 
+    watchlist = []
+    watched = []
     try:
         # Configure Gemini API
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        genai.configure(api_key=settings.GEMINI_API_KEY)  # type: ignore[attr-defined]
+        model = genai.GenerativeModel('gemini-1.5-flash')  # type: ignore[attr-defined]
 
         # Prepare user context
         watchlist = [
@@ -378,7 +397,7 @@ def _generate_ai_suggestions(user, user_movies, user_platform_ids, user_platform
         # Call Gemini API with timeout
         response = model.generate_content(
             prompt,
-            generation_config={
+            generation_config={  # type: ignore[arg-type]
                 'temperature': 0.7,
                 'max_output_tokens': 2000,
                 'top_p': 0.9,
@@ -750,14 +769,13 @@ def _validate_suggestions(suggestions, user_movies):
     return validated
 
 
-def _get_movie_availability(tconst, platform_ids, user_platforms):
+def _get_movie_availability(tconst, platform_ids):
     """
     Get movie availability on specified platforms.
 
     Args:
         tconst: Movie IMDb identifier
         platform_ids: List of platform IDs to check
-        user_platforms: List of UserPlatform objects for platform names
 
     Returns:
         list: Availability information for each platform:
@@ -856,5 +874,4 @@ def _get_bulk_movie_availability(tconsts, platform_ids):
             'platform_name': item['platform__platform_name'],
             'is_available': True
         })
-    
     return results

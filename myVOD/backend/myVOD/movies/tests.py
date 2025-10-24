@@ -29,9 +29,9 @@ class MovieSearchAPITests(APITestCase):
 
         Creates a diverse set of movies to test search functionality.
         """
-        # Create test platforms
-        cls.platform_netflix = Platform.objects.create(platform_slug='netflix', platform_name='Netflix')
-        cls.platform_hbo = Platform.objects.create(platform_slug='hbomax', platform_name='HBO Max')
+        # Use get_or_create to avoid IntegrityError in combined test runs
+        cls.platform_netflix, _ = Platform.objects.get_or_create(platform_slug='netflix', defaults={'platform_name': 'Netflix'})
+        cls.platform_hbo, _ = Platform.objects.get_or_create(platform_slug='hbomax', defaults={'platform_name': 'HBO Max'})
         
         # Create test movies with unique tconst and titles to avoid collisions with real IMDB data
         cls.movie1 = Movie.objects.create(
@@ -347,3 +347,66 @@ class MovieSearchAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         self.assertIsInstance(response.data, dict)
         self.assertIn('error', response.data)
+
+
+from io import StringIO
+from django.core.management import call_command
+from unittest.mock import patch
+
+class ManagementCommandsTests(APITestCase):
+
+    @patch('movies.management.commands.populate_availability.WatchmodeService')
+    def test_populate_availability_command(self, MockWatchmodeService):
+        # Arrange
+        platform_netflix, _ = Platform.objects.get_or_create(platform_slug='netflix', defaults={'platform_name': 'Netflix'})
+        mock_service_instance = MockWatchmodeService.return_value
+        mock_service_instance.list_titles.return_value = {
+            'titles': [
+                {'id': 101, 'imdb_id': 'tt0111161', 'title': 'The Shawshank Redemption', 'year': 1994},
+                {'id': 102, 'imdb_id': 'tt0068646', 'title': 'The Godfather', 'year': 1972},
+            ],
+            'total_pages': 1
+        }
+        
+        out = StringIO()
+        
+        # Act
+        call_command('populate_availability', 'netflix', stdout=out)
+
+        # Assert
+        self.assertIn("Finished populating movie availability.", out.getvalue())
+        self.assertTrue(Movie.objects.filter(tconst='tt0111161').exists())
+        self.assertTrue(MovieAvailability.objects.filter(tconst__tconst='tt0111161', platform=platform_netflix).exists())
+        mock_service_instance.list_titles.assert_called_once()
+
+    @patch('movies.management.commands.update_availability_changes.WatchmodeService')
+    def test_update_availability_changes_command(self, MockWatchmodeService):
+        # Arrange
+        platform_netflix, _ = Platform.objects.get_or_create(platform_slug='netflix', defaults={'platform_name': 'Netflix'})
+        # Ensure the movie exists with the correct watchmode_id for the test to find
+        movie, _ = Movie.objects.update_or_create(
+            tconst='tt0133093', 
+            defaults={'primary_title': 'The Matrix', 'watchmode_id': 201}
+        )
+        
+        mock_service_instance = MockWatchmodeService.return_value
+        mock_service_instance.get_source_changes.return_value = {
+            'titles': [201], # This is the watchmode_id
+            'total_pages': 1
+        }
+        mock_service_instance.get_title_details.return_value = {
+            'id': 201, 'sources': [{'name': 'Netflix'}]
+        }
+        
+        out = StringIO()
+
+        # Act
+        call_command('update_availability_changes', stdout=out)
+
+        # Assert
+        self.assertIn("Finished daily availability update.", out.getvalue())
+        # Verify that the availability was created or updated
+        availability = MovieAvailability.objects.get(tconst=movie, platform=platform_netflix)
+        self.assertTrue(availability.is_available)
+        mock_service_instance.get_source_changes.assert_called_once()
+        mock_service_instance.get_title_details.assert_called_once_with(201)

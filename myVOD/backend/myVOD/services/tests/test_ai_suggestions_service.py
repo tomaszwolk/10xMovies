@@ -6,7 +6,7 @@ Tests the business logic for AI movie suggestions functionality.
 import os
 import uuid
 from datetime import datetime, time
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -580,3 +580,215 @@ class LogIntegrationErrorTests(TestCase):
 
         # Should return None when logging fails
         self.assertIsNone(result)
+
+
+class AiSuggestionsServiceTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        # Use a mock user with a stable UUID
+        # (aligned with other tests to avoid FK to auth.users)
+        test_user_id = os.getenv(
+            "TEST_USER",
+            "00000000-0000-0000-0000-000000000000"
+        )
+        cls.user = Mock()
+        cls.user.id = uuid.UUID(test_user_id)
+        cls.user.email = 'test@example.com'
+
+        # Platforms
+        cls.p_netflix, _ = Platform.objects.get_or_create(
+            platform_slug='netflix',
+            defaults={'platform_name': 'Netflix'}
+        )
+        cls.p_hbo, _ = Platform.objects.get_or_create(
+            platform_slug='hbomax',
+            defaults={'platform_name': 'HBO Max'}
+        )
+
+        # User's subscribed platforms
+        UserPlatform.objects.get_or_create(
+            user_id=cls.user.id,
+            platform=cls.p_netflix
+        )
+
+        # Movies with HIGH num_votes
+        # (to ensure they appear in top 100 available movies)
+        cls.m_matrix, _ = Movie.objects.get_or_create(
+            tconst='tt0133093',
+            defaults={'primary_title': 'The Matrix', 'num_votes': 2000000}
+        )
+        cls.m_dune, _ = Movie.objects.get_or_create(
+            tconst='tt1160419',
+            defaults={'primary_title': 'Dune', 'num_votes': 1500000}
+        )
+        cls.m_watched, _ = Movie.objects.get_or_create(
+            tconst='tt0816692',
+            defaults={'primary_title': 'Interstellar', 'num_votes': 1800000}
+        )
+
+        # User's watched movie
+        UserMovie.objects.get_or_create(
+            user_id=cls.user.id,
+            tconst=cls.m_watched,
+            defaults={'watched_at': timezone.now()}
+        )
+
+        # Availability data
+        MovieAvailability.objects.get_or_create(
+            tconst=cls.m_matrix,
+            platform=cls.p_netflix,
+            defaults={
+                'is_available': True,
+                'last_checked': timezone.now(),
+                'source': 'test'
+            }
+        )
+        MovieAvailability.objects.get_or_create(
+            tconst=cls.m_dune,
+            platform=cls.p_hbo,
+            defaults={
+                'is_available': True,  # Not on user's platform
+                'last_checked': timezone.now(),
+                'source': 'test'
+            }
+        )
+
+    def test_insufficient_data_error_if_no_movies(self):
+        # Arrange
+        no_movies_user, _ = User.objects.get_or_create(
+            username='nomovies',
+            defaults={
+                'email': 'nomovies@example.com',
+                'password': 'password'
+            }
+        )
+
+        # Act & Assert
+        with self.assertRaises(InsufficientDataError):
+            get_or_generate_suggestions(no_movies_user)
+
+    @patch('services.ai_suggestions_service._get_available_movies_for_platforms')
+    @patch('services.ai_suggestions_service.genai.GenerativeModel')
+    def test_suggestions_are_generated_from_available_movies(
+        self, MockGenerativeModel, mock_get_available
+    ):
+        # Clean up any existing cached suggestions for this user
+        AiSuggestionBatch.objects.filter(user_id=self.user.id).delete()
+
+        # Arrange
+        # Mock available movies to return only The Matrix
+        # (on user's platform Netflix)
+        mock_get_available.return_value = [
+            {
+                'tconst': 'tt0133093',
+                'title': 'The Matrix',
+                'year': 1999,
+                'genres': ['Action', 'Sci-Fi'],
+                'rating': 8.7,
+                'platforms': ['Netflix']
+            }
+        ]
+
+        mock_model_instance = MockGenerativeModel.return_value
+        mock_response = MagicMock()
+        # Mocking a valid JSON response from Gemini
+        response_json = (
+            '[{"tconst": "tt0133093", '
+            '"justification": "Because it is a classic."}]'
+        )
+        mock_response.text = response_json
+        mock_model_instance.generate_content.return_value = mock_response
+
+        # Act
+        result = get_or_generate_suggestions(self.user)
+
+        # Assert
+        self.assertIn('suggestions', result)
+        self.assertEqual(len(result['suggestions']), 1)
+        # The Matrix
+        self.assertEqual(result['suggestions'][0]['tconst'], 'tt0133093')
+
+        # Check that the prompt sent to Gemini
+        # contained ONLY available movies
+        prompt_arg = mock_model_instance.generate_content.call_args[0][0]
+        self.assertIn("Available Movies on User's Platforms", prompt_arg)
+
+        # The Matrix should be in available movies list
+        self.assertIn("[tt0133093] The Matrix", prompt_arg)
+
+        # Dune should NOT be anywhere (not on user's platform)
+        self.assertNotIn("Dune", prompt_arg)
+
+        # Interstellar should be in "Watched" section but NOT in available
+        self.assertIn("Movies User Has Watched:", prompt_arg)
+        self.assertIn("Interstellar", prompt_arg)
+
+        # Extract the "Available Movies" section
+        # and verify Interstellar is NOT there
+        available_section_start = prompt_arg.find("## Available Movies")
+        available_section_end = prompt_arg.find("## Your Task:")
+        available_section = (
+            prompt_arg[available_section_start:available_section_end]
+        )
+
+        # Interstellar should NOT be in the available movies section
+        self.assertNotIn("[tt0816692]", available_section)
+        self.assertNotIn("Interstellar", available_section)
+
+    @patch('services.ai_suggestions_service._get_available_movies_for_platforms')
+    def test_cached_suggestions_returned_on_second_call(
+        self, mock_get_available
+    ):
+        """Test that second call returns cached suggestions.
+
+        Verifies that the second call doesn't call AI again.
+        """
+        # Clean up any existing cached suggestions for this user
+        AiSuggestionBatch.objects.filter(user_id=self.user.id).delete()
+
+        # Mock available movies
+        mock_get_available.return_value = [
+            {
+                'tconst': 'tt0133093',
+                'title': 'The Matrix',
+                'year': 1999,
+                'genres': ['Action', 'Sci-Fi'],
+                'rating': 8.7,
+                'platforms': ['Netflix']
+            }
+        ]
+
+        # Arrange
+        with patch(
+            'services.ai_suggestions_service.genai.GenerativeModel'
+        ) as MockModel:
+            mock_model_instance = MockModel.return_value
+            mock_response = MagicMock()
+            mock_response.text = (
+                '[{"tconst": "tt0133093", "justification": "..."}]'
+            )
+            mock_model_instance.generate_content.return_value = mock_response
+
+            # First call to generate and cache
+            first_result = get_or_generate_suggestions(self.user)
+            first_call_count = (
+                mock_model_instance.generate_content.call_count
+            )
+
+        # Act - second call should return cached data
+        second_result = get_or_generate_suggestions(self.user)
+
+        # Assert - second call should NOT call AI again (cached)
+        self.assertEqual(
+            mock_model_instance.generate_content.call_count,
+            first_call_count
+        )
+        # Both results should have same structure
+        self.assertIn('suggestions', second_result)
+        self.assertIn('expires_at', second_result)
+        # expires_at should be the same (same cached batch)
+        self.assertEqual(
+            first_result['expires_at'],
+            second_result['expires_at']
+        )
