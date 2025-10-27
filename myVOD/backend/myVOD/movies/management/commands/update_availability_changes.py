@@ -19,8 +19,8 @@ class Command(BaseCommand):
         self.stdout.write("Starting daily availability update...")
         service = WatchmodeService()
 
-        end_date = timezone.now().strftime("%Y-%m-%d")
-        start_date = (timezone.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        end_date = (timezone.now() - timedelta(days=1)).strftime("%Y%m%d")
+        start_date = (timezone.now() - timedelta(days=2)).strftime("%Y%m%d")
 
         self.stdout.write(f"Fetching changes from {start_date} to {end_date}...")
 

@@ -9,7 +9,7 @@ class WatchmodeService:
     BASE_URL = "https://api.watchmode.com/v1/"
     API_KEY = settings.WATCHMODE_API_KEY
 
-    def get_title_details(self, title_id: int, region: str = 'PL'):
+    def get_title_details(self, title_id: int, regions: str = 'PL'):
         """
         Fetches title details from the Watchmode API for a specific region.
         'title_id' is the Watchmode ID, not IMDb ID.
@@ -22,7 +22,7 @@ class WatchmodeService:
         params = {
             "apiKey": self.API_KEY,
             "append_to_response": "sources",
-            "region": region
+            "regions": regions
         }
 
         try:
@@ -59,7 +59,7 @@ class WatchmodeService:
             logger.error(f"Error listing titles from Watchmode API: {e}")
             return None
 
-    def get_source_changes(self, start_date: str, end_date: str, region: str = 'PL', page: int = 1):
+    def get_source_changes(self, start_date: str, end_date: str, regions: str = 'PL', page: int = 1, types='movie'):
         """
         Gets titles that have had their streaming sources changed within a date range.
         """
@@ -72,8 +72,9 @@ class WatchmodeService:
             "apiKey": self.API_KEY,
             "start_date": start_date,
             "end_date": end_date,
-            "region": region,
-            "page": page
+            "regions": regions,
+            "page": page,
+            "types": types
         }
 
         try:
