@@ -55,18 +55,27 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Finished daily availability update."))
 
     def process_title_update(self, watchmode_id, service):
-        try:
-            movie = Movie.objects.get(watchmode_id=watchmode_id)
-        except Movie.DoesNotExist:
+        details = service.get_title_details(watchmode_id)
+        if not details or "imdb_id" not in details:
             logger.warning(
-                f"Movie with watchmode_id {watchmode_id} not found in our DB. Skipping."
+                f"No IMDB ID found for watchmode_id {watchmode_id}. Skipping."
+            )
+            return
+
+        imdb_id = details.get('imdb_id')
+
+        # Check if movie exists in our database (loaded from IMDB)
+        try:
+            movie = Movie.objects.get(tconst=imdb_id)
+        except Movie.DoesNotExist:
+            logger.info(
+                f"Movie with IMDB ID {imdb_id} (watchmode_id: {watchmode_id}) not in IMDB database. Skipping."
             )
             return
 
         self.stdout.write(f"Updating availability for: {movie.primary_title}")
 
-        details = service.get_title_details(watchmode_id)
-        if not details or "sources" not in details:
+        if "sources" not in details:
             logger.warning(
                 f"No sources found for movie {movie.tconst} with watchmode_id {watchmode_id}"
             )

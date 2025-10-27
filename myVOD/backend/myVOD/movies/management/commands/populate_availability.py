@@ -94,18 +94,18 @@ class Command(BaseCommand):
         if not watchmode_id or not imdb_id:
             return
 
-        # Get or create the movie
-        movie, created = Movie.objects.get_or_create(
-            tconst=imdb_id,
-            defaults={
-                'primary_title': title_data.get('title', 'N/A'),
-                'start_year': title_data.get('year'),
-                'watchmode_id': watchmode_id,
-            }
-        )
+        # Check if the movie already exists in the database (loaded from IMDB)
+        try:
+            movie = Movie.objects.get(tconst=imdb_id)
+        except Movie.DoesNotExist:
+            logger.info(f"Skipping movie not in IMDB database: {title_data.get('title')} (tconst: {imdb_id})")
+            return
 
-        if created:
-            self.stdout.write(f"Created new movie: {movie.primary_title} ({movie.tconst})")
+        # Update watchmode_id if not already set
+        if not movie.watchmode_id:
+            movie.watchmode_id = watchmode_id
+            movie.save(update_fields=['watchmode_id'])
+            self.stdout.write(f"Updated watchmode_id for movie: {movie.primary_title} ({movie.tconst})")
 
         # Update or create availability
         MovieAvailability.objects.update_or_create(
