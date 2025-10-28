@@ -36,6 +36,32 @@ export type RegisteredUserDto = {
 };
 
 /**
+ * Command model for authenticating a user.
+ * Corresponds to the request body of `POST /api/token/`.
+ */
+export type LoginUserCommand = {
+  email: string;
+  password: string;
+};
+
+/**
+ * DTO for the JWT token pair returned upon successful authentication.
+ * Corresponds to the response of `POST /api/token/`.
+ */
+export type AuthTokensDto = {
+  access: string;
+  refresh: string;
+};
+
+/**
+ * DTO for a generic authentication error response.
+ * Standard error from djangorestframework-simplejwt on 401.
+ */
+export type AuthErrorDto = {
+  detail: string;
+};
+
+/**
  * DTO for the authenticated user's profile.
  * Corresponds to the response of `GET /api/me/`.
  */

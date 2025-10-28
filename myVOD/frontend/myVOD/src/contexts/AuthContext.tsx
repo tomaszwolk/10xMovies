@@ -1,0 +1,72 @@
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import type { AuthTokensDto } from "@/types/api.types";
+
+type AuthContextType = {
+  isAuthenticated: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+  login: (tokens: AuthTokensDto) => void;
+  logout: () => void;
+};
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const ACCESS_TOKEN_KEY = "myVOD_access_token";
+const REFRESH_TOKEN_KEY = "myVOD_refresh_token";
+
+/**
+ * AuthProvider manages JWT tokens and authentication state.
+ * Tokens are persisted in localStorage for session management.
+ */
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+
+  // Load tokens from localStorage on mount
+  useEffect(() => {
+    const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+    if (storedAccessToken && storedRefreshToken) {
+      setAccessToken(storedAccessToken);
+      setRefreshToken(storedRefreshToken);
+    }
+  }, []);
+
+  const login = (tokens: AuthTokensDto) => {
+    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);
+    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
+    setAccessToken(tokens.access);
+    setRefreshToken(tokens.refresh);
+  };
+
+  const logout = () => {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    setAccessToken(null);
+    setRefreshToken(null);
+  };
+
+  const isAuthenticated = !!accessToken && !!refreshToken;
+
+  return (
+    <AuthContext.Provider
+      value={{ isAuthenticated, accessToken, refreshToken, login, logout }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+/**
+ * Hook to access authentication context.
+ * Must be used within AuthProvider.
+ */
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return context;
+}
+
