@@ -33,7 +33,7 @@ class WatchmodeService:
             logger.error(f"Error fetching data from Watchmode API for title {title_id}: {e}")
             return None
 
-    def list_titles(self, source_ids: list[int], region: str = 'PL', types: list[str] = None, page: int = 1):
+    def list_titles(self, source_ids: list[int], region: str = 'PL', types: list[str] | None = None, page: int = 1):
         """
         Lists titles available on specific sources for a given region.
         """

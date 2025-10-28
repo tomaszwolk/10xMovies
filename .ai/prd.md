@@ -5,7 +5,7 @@
 MyVOD to aplikacja webowa wspierająca entuzjastów filmowych w zarządzaniu ich listą filmów do obejrzenia (watchlist) i odkrywaniu dostępności tych filmów na popularnych platformach VOD. Aplikacja rozwiązuje problem czasochłonnego przeszukiwania wielu platform streamingowych, umożliwiając użytkownikom szybkie sprawdzenie, które filmy z ich watchlisty są aktualnie dostępne na ich subskrypcjach.
 
 Kluczowe funkcjonalności MVP:
-- Zarządzanie osobistą watchlistą (do 10 filmów)
+- Zarządzanie osobistą watchlistą
 - Wyszukiwanie filmów z rozbudowanym autocomplete
 - Automatyczne sprawdzanie dostępności filmów na 5 głównych platformach VOD (Netflix, HBO Max, Disney+, Prime Video, Apple TV+)
 - Oznaczanie filmów jako obejrzane z historią
@@ -446,12 +446,11 @@ Prawne:
 2. Timeline projektu (rozpoczęcie, milestones, launch)
 3. Budżet operacyjny (API costs, hosting, infrastruktura)
 4. Szczegóły Watchmode.com API (limity, koszty, wspierane regiony)
-5. Interpretacja kryterium sukcesu #1 vs limit 10 filmów watchlisty
-6. Plan skalowania (oczekiwana liczba użytkowników, premium model)
-7. Rynek docelowy (globalny vs regionalny, język interfejsu)
-8. Szczegóły admin panel (dostęp, funkcje, moderacja)
-9. Strategia testowania (unit, integration, e2e, beta testing)
-10. Plan monetyzacji (freemium, subscription, ads)
+5. Plan skalowania (oczekiwana liczba użytkowników, premium model)
+6. Rynek docelowy (globalny vs regionalny, język interfejsu)
+7. Szczegóły admin panel (dostęp, funkcje, moderacja)
+8. Strategia testowania (unit, integration, e2e, beta testing)
+9.  Plan monetyzacji (freemium, subscription, ads)
 
 ## 5. Historyjki użytkowników
 
@@ -652,7 +651,7 @@ Kryteria akceptacji:
 - Działa niezależnie od innych filtrów
 
 US-017: Usuwanie filmu z watchlisty
-Jako użytkownik chcę usunąć film z mojej watchlisty, aby zrobić miejsce dla nowych filmów.
+Jako użytkownik chcę usunąć film z mojej watchlisty.
 
 Kryteria akceptacji:
 - Przycisk "Usuń" (ikona kosza) jest widoczny przy każdym filmie
@@ -661,7 +660,6 @@ Kryteria akceptacji:
 - Kliknięcie "Anuluj" zamyka dialog bez zmian
 - Kliknięcie "Usuń" usuwa film z widoku (soft delete z flagą deleted_at)
 - Toast/snackbar: "Film został usunięty z watchlisty"
-- Licznik watchlisty jest aktualizowany (np. 9/10)
 - Film pozostaje w bazie danych dla analytics
 
 US-018: Pusta watchlista
@@ -672,7 +670,6 @@ Kryteria akceptacji:
 - Tekst pomocniczy: "Użyj wyszukiwarki powyżej aby dodać pierwsze filmy"
 - Ikona/ilustracja pustego stanu (empty state)
 - Wyszukiwarka jest widoczna i aktywna
-- Licznik pokazuje "0/10"
 
 ### 5.6 Dostępność filmów na platformach VOD
 
@@ -724,7 +721,7 @@ Kryteria akceptacji:
 ### 5.7 Oznaczanie filmów jako obejrzane
 
 US-023: Oznaczenie filmu jako obejrzany
-Jako użytkownik chcę oznaczyć film jako obejrzany, aby przenieść go do historii i uwolnić miejsce na watchliście.
+Jako użytkownik chcę oznaczyć film jako obejrzany, aby przenieść go do historii.
 
 Kryteria akceptacji:
 - Checkbox/przycisk "Obejrzane" jest widoczny przy każdym filmie na watchliście
@@ -732,7 +729,6 @@ Kryteria akceptacji:
 - Film pojawia się w zakładce "Obejrzane"
 - Data obejrzenia jest automatycznie zapisywana jako data dzisiejsza
 - Toast/snackbar: "Film został oznaczony jako obejrzany"
-- Licznik watchlisty jest aktualizowany (np. 9/10, zwolnione miejsce)
 - Operacja jest natychmiastowa (brak przeładowania strony)
 
 US-024: Przeglądanie zakładki Obejrzane
@@ -754,8 +750,6 @@ Kryteria akceptacji:
 - Checkbox/przycisk "Przywróć do watchlisty" jest widoczny w zakładce "Obejrzane"
 - Po kliknięciu film znika z zakładki "Obejrzane"
 - Film pojawia się na watchliście
-- Sprawdzenie limitu watchlisty (10 filmów) przed przywróceniem
-- Jeśli watchlista pełna: komunikat błędu "Osiągnąłeś limit. Usuń film aby przywrócić."
 - Data obejrzenia jest usuwana z bazy
 - Toast/snackbar: "Film został przywrócony do watchlisty"
 
@@ -822,8 +816,6 @@ Jako użytkownik chcę dodać film z sugestii AI do watchlisty, aby obejrzeć go
 Kryteria akceptacji:
 - Przycisk "Dodaj do watchlisty" jest widoczny przy każdej sugestii
 - Po kliknięciu film jest dodawany do watchlisty z flagą "added_from_ai_suggestion"
-- Sprawdzenie limitu watchlisty (10 filmów)
-- Jeśli watchlista pełna: komunikat "Osiągnąłeś limit. Usuń film aby dodać nowy."
 - Toast/snackbar: "Film dodany do watchlisty"
 - Przycisk zmienia się na "Dodano" i jest disabled
 - Film pojawia się na watchliście w standardowym widoku
@@ -911,7 +903,6 @@ Kryteria akceptacji:
 - Przy usunięciu filmu z watchlisty rekord nie jest usuwany z bazy
 - Flaga "deleted_at" jest ustawiana na timestamp
 - Film nie pojawia się w watchliście użytkownika
-- Film nie jest liczony do limitu 10
 - Dane analytics nadal mają dostęp do historii dodań/usunięć
 - Admin panel może analizować pattern usuwania filmów
 - Rekord pozostaje w bazie danych na stałe (lub do hard delete konta)
@@ -1005,7 +996,6 @@ Interpretacja:
 - Średnia wartość (60-79%) wymaga analizy - czy użytkownicy osiągają 10 filmów i przestają dodawać, czy nie osiągają w ogóle
 
 Czynniki wpływające:
-- Limit 10 filmów na watchliście może ograniczać osiągnięcie tego celu
 - Obejrzane filmy pomagają osiągnąć próg 10
 - Onboarding zachęcający do dodania 3+3 filmów wspiera cel
 
@@ -1127,7 +1117,6 @@ Metryki dodatkowe dla głębszej analizy:
 
 2. Average Watchlist Size
    - Średnia liczba filmów na watchliście per użytkownik
-   - Trend: czy użytkownicy osiągają limit 10
 
 3. Churn Rate
    - Procent użytkowników nieaktywnych przez 30+ dni
