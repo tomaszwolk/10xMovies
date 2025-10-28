@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { LoginForm } from "@/pages/auth/components/LoginForm";
 
 /**
@@ -8,11 +9,20 @@ import { LoginForm } from "@/pages/auth/components/LoginForm";
  */
 export function LoginPage() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const successMessage = location.state?.message;
 
   useEffect(() => {
     document.title = "Logowanie - MyVOD";
   }, []);
+
+  // Redirect authenticated users to watchlist
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/watchlist", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 py-8">

@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { http } from '@/lib/http'
+import { setupAxiosInterceptors } from '@/lib/axios-interceptors'
 import './index.css'
 import { router } from './router'
 
@@ -15,6 +17,16 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// Setup Axios interceptors for automatic token refresh
+// The logout callback will be handled by AuthProvider
+setupAxiosInterceptors(http, () => {
+  // Clear tokens from localStorage
+  localStorage.removeItem("myVOD_access_token");
+  localStorage.removeItem("myVOD_refresh_token");
+  // Redirect to login
+  window.location.href = "/auth/login";
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

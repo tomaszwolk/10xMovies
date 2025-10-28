@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import type { AuthTokensDto } from "@/types/api.types";
 
 type AuthContextType = {
@@ -7,6 +8,7 @@ type AuthContextType = {
   refreshToken: string | null;
   login: (tokens: AuthTokensDto) => void;
   logout: () => void;
+  updateAccessToken: (newAccessToken: string) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,11 +49,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRefreshToken(null);
   };
 
+  const updateAccessToken = (newAccessToken: string) => {
+    localStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken);
+    setAccessToken(newAccessToken);
+  };
+
   const isAuthenticated = !!accessToken && !!refreshToken;
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, accessToken, refreshToken, login, logout }}
+      value={{ 
+        isAuthenticated, 
+        accessToken, 
+        refreshToken, 
+        login, 
+        logout,
+        updateAccessToken 
+      }}
     >
       {children}
     </AuthContext.Provider>

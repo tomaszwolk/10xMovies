@@ -32,3 +32,18 @@ export async function loginUser(
   return data;
 }
 
+/**
+ * Refresh the access token using a refresh token.
+ * @param refreshToken - The refresh token
+ * @returns New access token
+ * @throws API error if refresh token is invalid or expired
+ */
+export async function refreshAccessToken(
+  refreshToken: string
+): Promise<{ access: string }> {
+  const { data } = await http.post<{ access: string }>("/token/refresh/", {
+    refresh: refreshToken,
+  });
+  return data;
+}
+

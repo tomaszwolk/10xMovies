@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { RegisterForm } from "@/pages/auth/components/RegisterForm";
 
 /**
@@ -6,13 +8,20 @@ import { RegisterForm } from "@/pages/auth/components/RegisterForm";
  * Handles page layout, title, and redirects if user is already logged in.
  */
 export function RegisterPage() {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
   useEffect(() => {
     // Set page title
     document.title = "Rejestracja - MyVOD";
   }, []);
 
-  // TODO: Add auth check - if user is logged in, redirect to home
-  // For now, we'll implement this later when auth context is available
+  // Redirect authenticated users to watchlist
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/watchlist", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 py-8">
