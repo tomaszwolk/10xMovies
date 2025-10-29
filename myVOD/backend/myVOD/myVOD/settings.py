@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +26,9 @@ load_dotenv()
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', '33a87f684073ecdb7d217f950c34181a')
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise ImproperlyConfigured("SECRET_KEY is not set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -45,7 +48,9 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
+    "users",
     "movies",
     "user_movies",
 ]
@@ -144,7 +149,8 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Using default Django auth.User (integer PK)
+# Use custom User model with UUID primary key
+AUTH_USER_MODEL = "users.User"
 
 
 # Django REST Framework Configuration
@@ -175,10 +181,7 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
 }
 
-# Simple JWT Configuration
-# NOTE: This app uses Supabase Auth where users have UUID primary keys.
-# All models use user_id as UUIDField to match Supabase auth.users table.
-# Django's default User model (Integer PK) is NOT used for authentication.
+# Simple JWT Configuration (Django UUIDs are the source of truth)
 SIMPLE_JWT = {
     # Token lifetime
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
@@ -198,7 +201,7 @@ SIMPLE_JWT = {
 
     # Token refresh
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 # DRF Spectacular (API Documentation) Configuration

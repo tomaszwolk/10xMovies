@@ -32,7 +32,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/watchlist",
-    element: <WatchlistPage />,
+    element: (
+      <ProtectedRoute>
+        <WatchlistPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/auth",

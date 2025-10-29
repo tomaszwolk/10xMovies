@@ -6,17 +6,11 @@ This document outlines the database schema for the myVOD application, based on t
 
 ### Users and Identity
 
-This project uses two user concepts:
+Single user concept (source of truth):
 
-1) Django application users (authentication)
-- Stored in Django's default table: `auth_user` (integer primary key)
+- Django application users with UUID primary key in table `public.users_user`
 - Managed by Django Auth + SimpleJWT; used for login and permissions
-
-2) Canonical UUIDs for domain data
-- Domain tables (`user_platform`, `user_movie`, `ai_suggestion_batch`, `event`) store a `user_id UUID`
-- This UUID corresponds to Supabase `auth.users(id)`
-- Django does not create rows in `auth.users`; when a UUID is required, the application resolves it by looking up `auth.users` by the authenticated user's email
-- In tests, UUIDs are injected or mocked; in production, ensure a corresponding `auth.users` row exists where needed
+- Domain tables (`user_platform`, `user_movie`, `ai_suggestion_batch`, `event`, `integration_error_log`) store a `user_id UUID` that references `public.users_user(id)`
 
 ---
 
@@ -37,7 +31,7 @@ Links users to their subscribed VOD platforms (M:N relationship).
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
 | `id` | `bigint` | **Primary Key**, Identity | Surrogate key for the row. |
-| `user_id` | `uuid` | **Foreign Key** -> `auth.users(id)` ON DELETE CASCADE, Not Null | User's identifier. |
+| `user_id` | `uuid` | **Foreign Key** -> `public.users_user(id)` ON DELETE CASCADE, Not Null | User's identifier. |
 | `platform_id` | `smallint` | **Foreign Key** -> `platform(id)` ON DELETE CASCADE, Not Null | Platform's identifier. |
 | | | **Unique** (`user_id`, `platform_id`) | Ensures a user can only subscribe to each platform once. |
 
@@ -70,7 +64,7 @@ Tracks a user's interaction with a movie (watchlist, watched history).
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
 | `id` | `bigint` | **Primary Key**, Identity | Unique identifier for the interaction. |
-| `user_id` | `uuid` | **Foreign Key** -> `auth.users(id)` ON DELETE CASCADE, Not Null | The user associated with this interaction. |
+| `user_id` | `uuid` | **Foreign Key** -> `public.users_user(id)` ON DELETE CASCADE, Not Null | The user associated with this interaction. |
 | `tconst` | `text` | **Foreign Key** -> `movie(tconst)` ON DELETE CASCADE, Not Null | The movie associated with this interaction. |
 | `watchlisted_at`| `timestamptz` | | Timestamp when the movie was added to the watchlist. |
 | `watchlist_deleted_at`| `timestamptz` | | Timestamp for soft-deleting from the watchlist. |
@@ -102,7 +96,7 @@ Caches AI-generated movie suggestions for users.
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
 | `id` | `bigint` | **Primary Key**, Identity | Unique identifier for the suggestion batch. |
-| `user_id` | `uuid` | **Foreign Key** -> `auth.users(id)` ON DELETE CASCADE, Not Null | The user who received the suggestions. |
+| `user_id` | `uuid` | **Foreign Key** -> `public.users_user(id)` ON DELETE CASCADE, Not Null | The user who received the suggestions. |
 | `generated_at` | `timestamptz` | Not Null, `default now()` | Timestamp when the suggestions were generated. Used for calendar-day rate limiting. |
 | `expires_at` | `timestamptz` | Not Null | Expiration time for the cached suggestions (set to end of calendar day: 23:59:59). |
 | `prompt` | `text` | | The user prompt that generated the suggestions. |
@@ -118,7 +112,7 @@ A partitioned table for analytics events.
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
 | `id` | `bigint` | Identity | Unique identifier for the event. |
-| `user_id` | `uuid` | **Foreign Key** -> `auth.users(id)` ON DELETE SET NULL | The user who triggered the event. |
+| `user_id` | `uuid` | **Foreign Key** -> `public.users_user(id)` ON DELETE SET NULL | The user who triggered the event. |
 | `event_type` | `text` | Not Null | Type of event (e.g., "search", "availability_refresh"). |
 | `occurred_at` | `timestamptz` | Not Null, `default now()` | Timestamp of the event. |
 | `properties` | `jsonb` | | Additional event data (e.g., `{ "query": "...", "results_count": 5 }`). |
@@ -137,7 +131,7 @@ A partitioned table for logging errors from external API integrations.
 | `api_type` | `text` | Not Null | The external API that produced the error (e.g., "tmdb", "watchmode"). |
 | `error_message`| `text` | Not Null | The error message. |
 | `error_details`| `jsonb` | | Detailed error information (e.g., stack trace, request body). |
-| `user_id` | `uuid` | **Foreign Key** -> `auth.users(id)` ON DELETE SET NULL | The user associated with the request, if any. |
+| `user_id` | `uuid` | **Foreign Key** -> `public.users_user(id)` ON DELETE SET NULL | The user associated with the request, if any. |
 | `occurred_at` | `timestamptz` | Not Null, `default now()` | Timestamp of the error. |
 
 **Partitioning:** Partition by `RANGE(occurred_at)` monthly.
@@ -172,20 +166,14 @@ A partitioned table for logging errors from external API integrations.
 
 ## 4. PostgreSQL Policies (Row-Level Security)
 
-**Important**: This application uses **Django Auth + JWT**, not Supabase Auth. Therefore:
-- Django connects as a single application user (`postgres.[project-ref]`), NOT as individual end-users
-- `auth.uid()` always returns NULL (no Supabase session)
-- **Authorization is handled in Django** via ORM filters
+**Important**: This application uses **Django Auth + JWT**. Therefore:
+- Django connects as a single application user to Postgres (no per-user DB sessions)
+- Row ownership and authorization are enforced in the Django application layer
 
 **RLS Configuration:**
-- **User-owned tables** (`user_platform`, `user_movie`, `ai_suggestion_batch`, `event`): **RLS DISABLED**
-  - Authorization enforced at application layer (Django views/serializers)
-  - Migration `20251015120000_disable_rls_for_django_auth.sql` removes incompatible policies
-- **Read-Only Public Data** (`movie`, `platform`, `movie_availability`): **RLS ENABLED**
-  - Prevents accidental writes from Django
-  - Authenticated users have read-only access
-- **Admin-Only Tables** (`integration_error_log`): **RLS ENABLED**
-  - Only `service_role` can access (admin/monitoring tools)
+- **User-owned tables** (`user_platform`, `user_movie`, `ai_suggestion_batch`, `event`): RLS disabled; authorization in Django views/services
+- **Read-Only Data** (`movie`, `platform`, `movie_availability`): RLS enabled to prevent writes
+- **Admin-Only** (`integration_error_log`): RLS enabled; accessible to admin role only
 
 ## 5. Extensions
 
@@ -216,7 +204,7 @@ In addition to the tables defined above, the database will also contain standard
 
 ### Authentication Model
 
-The application uses **JWT (JSON Web Tokens)** for API authentication via `djangorestframework-simplejwt`. This provides stateless authentication without relying on database sessions. JWTs include:
-- **Access Token**: Short-lived token (15 minutes) for API requests
-- **Refresh Token**: Long-lived token (7 days) for obtaining new access tokens
-- **Blacklisting**: Refresh tokens can be blacklisted on logout when `ROTATE_REFRESH_TOKENS` and `BLACKLIST_AFTER_ROTATION` are enabled
+The application uses **JWT (JSON Web Tokens)** via `djangorestframework-simplejwt`:
+- **Access Token**: 1 hour (configurable)
+- **Refresh Token**: 1 day (configurable)
+- **Blacklisting**: Enabled after rotation (refresh tokens are blacklisted on rotation/logout)

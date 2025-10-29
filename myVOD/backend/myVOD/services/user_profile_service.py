@@ -10,6 +10,7 @@ from django.db import transaction, DatabaseError
 from django.contrib.auth import get_user_model
 from movies.models import Platform, UserPlatform
 from services.user_movies_service import _resolve_user_uuid
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,8 @@ def get_user_profile(user):
     """
     try:
         # Resolve canonical Supabase user UUID (works for both UUID and int ids)
-        user_uuid = _resolve_user_uuid(user)
+        user_uuid_str = _resolve_user_uuid(user)
+        user_uuid = uuid.UUID(str(user_uuid_str))
 
         # Get user's platform IDs
         user_platform_ids = UserPlatform.objects.filter(
@@ -96,7 +98,8 @@ def update_user_platforms(user, platform_ids: list[int]):
     try:
         with transaction.atomic():
             # Resolve canonical Supabase user UUID (works for both UUID and int ids)
-            user_uuid = _resolve_user_uuid(user)
+            user_uuid_str = _resolve_user_uuid(user)
+            user_uuid = uuid.UUID(str(user_uuid_str))
 
             # Get current user platforms
             current_platform_ids = set(
@@ -122,16 +125,14 @@ def update_user_platforms(user, platform_ids: list[int]):
                     f"Deleted {deleted_count} platform associations for user {user.email}"
                 )
 
-            # Insert new platforms
+            # Insert new platforms (row-by-row to preserve UUID typing)
             if to_add:
-                new_records = [
-                    UserPlatform(user_id=user_uuid, platform_id=platform_id)
-                    for platform_id in to_add
-                ]
-                UserPlatform.objects.bulk_create(
-                    new_records,
-                    ignore_conflicts=True  # Handle race conditions
-                )
+                for platform_id in to_add:
+                    # Using create avoids UNNEST(text[]) casting issues with UUID
+                    UserPlatform.objects.create(
+                        user_id=user_uuid,
+                        platform_id=platform_id
+                    )
 
                 logger.info(
                     f"Added {len(to_add)} platform associations for user {user.email}"

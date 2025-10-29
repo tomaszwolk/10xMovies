@@ -1,19 +1,18 @@
-import type { Tables } from './database.types';
+// --- API DTOs (decoupled from DB schema) ---
+// These types mirror the Django serializers' responses instead of raw DB tables.
 
-// --- Database Entity Aliases ---
-// These aliases provide convenient shortcuts to the raw database types.
+export type PlatformDto = {
+  id: number;
+  platform_slug: string;
+  platform_name: string;
+};
 
-/** Represents a row from the 'movie' table. */
-type Movie = Tables<'movie'>;
-
-/** Represents a row from the 'platform' table. */
-type Platform = Tables<'platform'>;
-
-/** Represents a row from the 'user_movie' table. */
-type UserMovie = Tables<'user_movie'>;
-
-/** Represents a row from the 'movie_availability' table. */
-type MovieAvailability = Tables<'movie_availability'>;
+type MovieSearchCore = {
+  tconst: string;
+  primary_title: string;
+  start_year: number | null;
+  poster_path: string | null;
+};
 
 
 // --- Auth & User Management ---
@@ -83,11 +82,13 @@ export type UpdateUserProfileCommand = {
 // --- Movies & Platforms ---
 
 /**
- * DTO for a single VOD platform.
- * This directly maps to the 'platform' table schema.
- * Corresponds to an item in the response of `GET /api/platforms/`.
+ * DTO for a movie item in a search result list.
+ * A subset of the movie entity returned by the API.
  */
-export type PlatformDto = Platform;
+export type MovieSearchResultDto = MovieSearchCore & {
+  /** The average rating as a string in API responses. */
+  avg_rating: string | null;
+};
 
 /**
  * DTO for a movie item in a search result list.
@@ -95,53 +96,38 @@ export type PlatformDto = Platform;
  * Note: `avg_rating` is represented as a string, as specified in the API plan.
  * Corresponds to an item in the response of `GET /api/movies/`.
  */
-export type MovieSearchResultDto = Omit<
-  Pick<
-    Movie,
-    'tconst' | 'primary_title' | 'start_year' | 'avg_rating' | 'poster_path'
-  >,
-  'avg_rating'
-> & {
-  /** The average rating, potentially as a string from the API. */
-  avg_rating: string | null;
-};
+// --- Watchlist & Watched History ---
 
 
 // --- Watchlist & Watched History ---
 
-/**
- * DTO for the detailed movie information nested within `UserMovieDto`.
- */
-type UserMovieDetailDto = Omit<
-  Pick<
-    Movie,
-    | 'tconst'
-    | 'primary_title'
-    | 'start_year'
-    | 'genres'
-    | 'avg_rating'
-    | 'poster_path'
-  >,
-  'avg_rating'
-> & {
-  /** The average rating, potentially as a string from the API. */
+/** Details nested within a user movie item. */
+type UserMovieDetailDto = {
+  tconst: string;
+  primary_title: string;
+  start_year: number | null;
+  genres: string[] | null;
   avg_rating: string | null;
+  poster_path: string | null;
 };
 
 /**
  * DTO for the availability status of a movie on a specific platform.
  */
 export type MovieAvailabilityDto = {
-  platform_id: Platform['id'];
-  platform_name: Platform['platform_name'];
-  is_available: MovieAvailability['is_available'];
+  platform_id: number;
+  platform_name: string;
+  is_available: boolean | null;
 };
 
 /**
  * DTO for a movie on a user's watchlist or watched history.
  * Corresponds to an item in the response of `GET /api/user-movies/`.
  */
-export type UserMovieDto = Pick<UserMovie, 'id' | 'watchlisted_at' | 'watched_at'> & {
+export type UserMovieDto = {
+  id: number;
+  watchlisted_at: string | null;
+  watched_at: string | null;
   movie: UserMovieDetailDto;
   availability: MovieAvailabilityDto[];
 };
@@ -150,7 +136,7 @@ export type UserMovieDto = Pick<UserMovie, 'id' | 'watchlisted_at' | 'watched_at
  * Command model for adding a movie to the user's watchlist.
  * Corresponds to the request body of `POST /api/user-movies/`.
  */
-export type AddUserMovieCommand = Pick<Movie, 'tconst'>;
+export type AddUserMovieCommand = { tconst: string };
 
 /**
  * Command model for updating a `user_movie` entry, e.g., marking it as watched.
@@ -167,10 +153,10 @@ export type UpdateUserMovieCommand = {
  * DTO for a single AI-generated movie suggestion.
  * Nested within the `AISuggestionsDto`.
  */
-export type SuggestionItemDto = Pick<
-  Movie,
-  'tconst' | 'primary_title' | 'start_year'
-> & {
+export type SuggestionItemDto = {
+  tconst: string;
+  primary_title: string;
+  start_year: number | null;
   /** AI-generated reason for the suggestion. */
   justification: string;
   availability: MovieAvailabilityDto[];

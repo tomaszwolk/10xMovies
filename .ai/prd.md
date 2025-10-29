@@ -489,7 +489,7 @@ Jako zalogowany użytkownik chcę wylogować się z aplikacji, aby zabezpieczyć
 Kryteria akceptacji:
 - Przycisk "Wyloguj" jest widoczny w interfejsie (menu/header)
 - Po kliknięciu tokeny JWT są usuwane z local storage po stronie klienta
-- Refresh token jest dodawany do blacklisty (opcjonalnie, zależnie od konfiguracji)
+- Refresh token jest dodawany do blacklisty (włączone)
 - Użytkownik jest przekierowany do strony logowania
 - Próba dostępu do chronionej strony po wylogowaniu przekierowuje do logowania
 

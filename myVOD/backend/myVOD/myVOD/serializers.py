@@ -9,8 +9,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from movies.models import Platform
-import uuid
-from services.user_movies_service import _get_supabase_user_uuid
 
 User = get_user_model()
 
@@ -58,20 +56,11 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'User account is disabled'
             )
 
-        # Use a stable email string for claims/lookups
-        user_email: str = str(getattr(user, 'email', email) or email or "")
-
         # Issue tokens and add custom claims to both refresh and access
         refresh = RefreshToken.for_user(user)
 
-        try:
-            # Resolve canonical Supabase user UUID for this email
-            supabase_uuid = _get_supabase_user_uuid(user_email)
-            user_uuid = supabase_uuid
-        except Exception:
-            # Dev fallback: deterministic UUID derived from email for local setups
-            # Ensures consistent UUID across sessions without Supabase
-            user_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, user_email))
+        user_email: str = str(getattr(user, 'email', email))
+        user_uuid: str = str(getattr(user, 'id'))  # Use Django users_user UUID
 
         # Add claims to both tokens
         access = refresh.access_token

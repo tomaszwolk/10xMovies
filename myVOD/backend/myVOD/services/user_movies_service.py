@@ -33,22 +33,15 @@ def _get_supabase_user_uuid(email: str):
 def _resolve_user_uuid(user):
     """Resolve canonical UUID for the given user.
 
-    Strategy:
-    - If user.id looks like a UUID, trust and return it (works for tests using Mock with UUID)
-    - Else, fallback to Supabase lookup by email (works for Django auth.User with int PK)
+    Production path: trust Django users_user UUID.
     """
-    # Prefer direct UUID on the user object
-    if hasattr(user, "id"):
-        try:
-            return str(uuid.UUID(str(user.id)))
-        except Exception:
-            pass
+    if not hasattr(user, "id"):
+        raise Exception("Unable to resolve user UUID: missing id on user")
 
-    # Fallback to Supabase auth.users lookup by email
-    if hasattr(user, "email"):
-        return _get_supabase_user_uuid(user.email)
-
-    raise Exception("Unable to resolve user UUID: user has neither UUID-like id nor email")
+    try:
+        return str(uuid.UUID(str(user.id)))
+    except Exception:
+        raise Exception("User id is not a valid UUID")
 
 
 def build_user_movies_queryset(

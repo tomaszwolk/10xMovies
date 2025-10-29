@@ -39,7 +39,7 @@ class Movie(models.Model):
 
 class UserPlatform(models.Model):
     id = models.BigAutoField(primary_key=True)
-    user_id = models.CharField(max_length=50)  # Changed from UUIDField to CharField
+    user_id = models.UUIDField()
     platform = models.ForeignKey(Platform, models.DO_NOTHING)
 
     class Meta:
@@ -50,7 +50,7 @@ class UserPlatform(models.Model):
 
 class UserMovie(models.Model):
     id = models.BigAutoField(primary_key=True)
-    user_id = models.CharField(max_length=50)  # Changed from UUIDField to CharField
+    user_id = models.UUIDField()
     tconst = models.ForeignKey(Movie, models.DO_NOTHING, db_column='tconst')
     watchlisted_at = models.DateTimeField(blank=True, null=True)
     watchlist_deleted_at = models.DateTimeField(blank=True, null=True)
@@ -80,7 +80,7 @@ class MovieAvailability(models.Model):
 
 class AiSuggestionBatch(models.Model):
     id = models.BigAutoField(primary_key=True)
-    user_id = models.CharField(max_length=50)  # Changed from UUIDField to CharField
+    user_id = models.UUIDField()
     generated_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     prompt = models.TextField(blank=True, null=True)
@@ -93,7 +93,7 @@ class AiSuggestionBatch(models.Model):
 
 class Event(models.Model):
     id = models.BigAutoField(primary_key=True)
-    user_id = models.CharField(max_length=50, blank=True, null=True)  # Changed from UUIDField to CharField
+    user_id = models.UUIDField(blank=True, null=True)
     event_type = models.TextField()
     occurred_at = models.DateTimeField()
     properties = models.JSONField(blank=True, null=True)
@@ -109,7 +109,7 @@ class IntegrationErrorLog(models.Model):
     api_type = models.TextField()
     error_message = models.TextField()
     error_details = models.JSONField(blank=True, null=True)
-    user_id = models.CharField(max_length=50, blank=True, null=True)  # Changed from UUIDField to CharField
+    user_id = models.UUIDField(blank=True, null=True)
     occurred_at = models.DateTimeField()
 
     class Meta:

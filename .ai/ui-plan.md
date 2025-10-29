@@ -7,7 +7,7 @@ Architektura interfejsu użytkownika MyVOD skupia się na trzech filarach: (1) s
 Wysoki poziom podziału UI:
 - Public: logowanie i rejestracja (`/auth/*`).
 - Onboarding (3 kroki) dostępny tylko przy pierwszym logowaniu (`/onboarding/*`).
-- Aplikacja właściwa: dashboard watchlisty, zakładka „Obejrzane”, modal/podstrona sugestii AI, profil użytkownika (`/app/*`).
+- Aplikacja właściwa: dashboard watchlisty (`/watchlist`). (Pozostałe widoki jak „Obejrzane”, profil i sugestie AI będą dodane później.)
 - Admin dashboard metryk (MVP – podstawowy zakres) (`/admin`).
 - Strony błędów i fallbacki (401/403/404/offline) oraz guardy chroniące prywatne ścieżki.
 
@@ -44,7 +44,7 @@ Zgodność z API: wszystkie interakcje użytkownika mapują się na przewidziane
 - UX, dostępność i względy bezpieczeństwa: możliwość przejścia dalej bez wyboru, zachowanie wyboru, focus i role dla checkboxów, wizualne stany zaznaczenia.
 
 4) Widok: Onboarding – Krok 2: Dodaj 3 filmy do watchlisty
-- Ścieżka widoku: `/onboarding/add`
+- Ścieżka widoku: `/onboarding/first-movies`
 - Główny cel: Dodanie 0–3 filmów do watchlisty poprzez wyszukiwarkę z autocomplete.
 - Kluczowe informacje do wyświetlenia: pole wyszukiwania, dropdown do 10 wyników (plakat, tytuł, rok, ocena), licznik „Dodane: X/3”, lista dodanych.
 - Kluczowe komponenty widoku: Combobox z debounce, Lista wyników, Lista dodanych pozycji (mini-kafelki), Buttons (Dalej, Skip).
@@ -58,7 +58,7 @@ Zgodność z API: wszystkie interakcje użytkownika mapują się na przewidziane
 - UX, dostępność i względy bezpieczeństwa: brak wymuszeń (można 0/3), komunikaty sukcesu/błędu, mechanika: dodanie, jeśli brak, a następnie oznaczenie jako obejrzane w tle.
 
 6) Widok: Dashboard – Watchlista
-- Ścieżka widoku: `/app/watchlist`
+- Ścieżka widoku: `/watchlist`
 - Główny cel: Centralne zarządzanie filmami do obejrzenia, z podglądem dostępności VOD i szybkim dodawaniem.
 - Kluczowe informacje do wyświetlenia: kafelki/wiersze filmów (plakat/placeholder, tytuł, rok, ocena IMDb, gatunki), ikony dostępności VOD, badge „Niedostępne…”, data „Stan z: [data]”, licznik widocznych.
 - Kluczowe komponenty widoku: App header, Search Combobox (limit 10), Toggle widoków (kafelki/lista), Sortowanie (dropdown), Filtry (checkbox „Tylko dostępne”, przycisk „Ukryj niedostępne”), Karta/Wiersz filmu z akcjami (Oznacz obejrzane, Usuń), Toastery, Paginacja/wirtualizacja (opcjonalnie), Przycisk „Zasugeruj filmy”.
@@ -105,28 +105,28 @@ Główne przepływy i przejścia między widokami:
 
 1) Rejestracja → Logowanie → Onboarding → Dashboard watchlisty
 - Rejestracja (`/auth/register`) – 201; przekierowanie do logowania.
-- Logowanie (`/auth/login`) – po sukcesie sprawdzenie stanu onboardingu (pierwsze logowanie) i redirect do `/onboarding/platforms` lub `/app/watchlist`.
-- Onboarding kroki 1–3 (`/onboarding/*`) – każdy krok pozwala „Skip”; po „Zakończ/Skip” → `/app/watchlist`.
+- Logowanie (`/auth/login`) – po sukcesie sprawdzenie stanu onboardingu (pierwsze logowanie) i redirect do `/onboarding/platforms` lub `/watchlist`.
+- Onboarding kroki 1–3 (`/onboarding/*`) – każdy krok pozwala „Skip”; po „Zakończ/Skip” → `/watchlist`.
 
-2) Główny przypadek użycia – Dodaj film i obejrzyj
-- Start: `/app/watchlist`.
+1) Główny przypadek użycia – Dodaj film i obejrzyj
+- Start: `/watchlist`.
 - Wyszukiwanie (Combobox) → GET `/api/movies?search=…` → wybór pozycji → POST `/api/user-movies/` → toast „Dodano”.
 - Przeglądanie dostępności (Watchmode) i filtr „Tylko dostępne”/„Ukryj niedostępne”.
 - Oznacz jako „Obejrzane” → PATCH `/api/user-movies/<id>/ {action: mark_as_watched}` → toast, film znika z watchlisty i pojawia się w `/app/watched`.
 
-3) Sugestie AI – odkrywanie nowych tytułów
+1) Sugestie AI – odkrywanie nowych tytułów
 - Z /app/watchlist: klik „Zasugeruj filmy” → modal lub `/app/suggestions`.
 - GET `/api/suggestions/`:
   - 200: lista 1–5 sugestii → „Dodaj do watchlisty”: POST `/api/user-movies/` (z flagą po stronie backendu) → toast, disable przycisku.
   - 429: pokazanie limitu i czasu do resetu.
   - 404: komunikat „Dodaj filmy do watchlisty lub oznacz jako obejrzane…”.
 
-4) Edycja profilu – platformy i RODO
+1) Edycja profilu – platformy i RODO
 - `/app/profile` → GET `/api/me/` i `/api/platforms/`.
 - Zmiana platform → PATCH `/api/me/` → refresh ikon dostępności w listach.
 - „Usuń konto” → AlertDialog → potwierdzenie → hard delete po stronie backendu → clear tokeny → redirect do `/` lub `/auth/login` z komunikatem.
 
-5) Sesja i bezpieczeństwo
+1) Sesja i bezpieczeństwo
 - Każdy request z access tokenem. Na 401: próba refresh (`/api/token/refresh/`); gdy refresh niepowodzenie → redirect do `/auth/login` z komunikatem „Twoja sesja wygasła…”.
 - Ochrona tras: guard dla `/app/*` i `/admin`.
 

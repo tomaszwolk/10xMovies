@@ -4,7 +4,7 @@ This document outlines the design for the MyVOD REST API, based on the provided 
 
 ## 1. Resources
 
-- **Users**: Represents application users. Corresponds to `auth.users` table managed by Supabase/Django Auth. User-specific data like preferences is handled via the `/api/me/` endpoint.
+- **Users**: Represents application users. Corresponds to `public.users_user` (custom Django user with UUID PK). User-specific data like preferences is handled via the `/api/me/` endpoint.
 - **Platforms**: Represents VOD streaming platforms. Corresponds to the `platform` table. This is mostly read-only data for the frontend.
 - **Movies**: Represents movie data from the IMDb dataset. Corresponds to the `movie` table. Primarily used for searching.
 - **UserMovies**: Represents the relationship between a user and a movie (watchlist, watched history). Corresponds to the `user_movie` table. This is the main resource for user interactions.

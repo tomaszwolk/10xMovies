@@ -1,36 +1,10 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
+from django.contrib.auth import get_user_model
 import uuid
 
 
-class MockUser:
-    """
-    Mock user object for JWT authentication with UUID.
-
-    Since we use Supabase Auth with UUID primary keys,
-    we don't use Django's auth_user table.
-    """
-    def __init__(self, user_id, email=None):
-        # Handle both UUID strings and regular IDs
-        if isinstance(user_id, str) and len(user_id) == 36 and '-' in user_id:
-            # It's a UUID string, convert to UUID object
-            self.id = uuid.UUID(user_id)
-        else:
-            # It's a regular ID, keep as string but create UUID-like identifier
-            # For backward compatibility, we'll create a UUID from string
-            self.id = str(user_id)  # Keep as string for now
-
-        self.email = email or f"user-{user_id}@example.com"
-        self.is_authenticated = True
-        self.is_active = True
-        self.is_staff = False
-        self.is_superuser = False
-
-    def __str__(self):
-        return f"MockUser({self.id})"
-
-    def __repr__(self):
-        return self.__str__()
+User = get_user_model()
 
 
 class UUIDJWTAuthentication(JWTAuthentication):
@@ -43,23 +17,26 @@ class UUIDJWTAuthentication(JWTAuthentication):
 
     def get_user(self, validated_token):
         """
-        Get user from validated token.
+        Resolve the authenticated Django user from JWT.
 
-        Instead of querying Django's auth_user table,
-        we create a mock user with UUID from token.
+        - Expects 'user_id' claim to be a UUID string
+        - Loads users.User from DB and validates is_active
         """
+        user_id_claim = validated_token.get('user_id')
+        if not user_id_claim:
+            raise InvalidToken('Token contained no recognizable user identification')
+
         try:
-            user_id = validated_token.get('user_id')
-            email = validated_token.get('email')
+            user_uuid = uuid.UUID(str(user_id_claim))
+        except Exception:
+            raise InvalidToken('Token user_id is not a valid UUID')
 
-            if not user_id:
-                raise InvalidToken('Token contained no recognizable user identification')
+        try:
+            user = User.objects.get(id=user_uuid)
+        except User.DoesNotExist:
+            raise InvalidToken('User not found')
 
-            # Debug: print user_id to see what we're getting
-            print(f"UUIDJWTAuthentication: user_id from token: {repr(user_id)}")
+        if not getattr(user, 'is_active', True):
+            raise InvalidToken('User account is disabled')
 
-            # Create mock user with UUID
-            return MockUser(user_id, email)
-
-        except Exception as e:
-            raise InvalidToken(f'Token is invalid or expired: {str(e)}')
+        return user
