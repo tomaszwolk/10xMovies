@@ -3,11 +3,14 @@ Custom serializers for myVOD project.
 """
 
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from movies.models import Platform
+import uuid
+from services.user_movies_service import _get_supabase_user_uuid
 
 User = get_user_model()
 
@@ -22,7 +25,7 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     email = serializers.CharField(required=True)
     password = serializers.CharField(required=True)
-    username_field = User.EMAIL_FIELD if hasattr(User, 'EMAIL_FIELD') else 'username'
+    username_field = 'email'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -35,7 +38,7 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         Authenticate using email instead of username.
         """
         email = attrs.get('email')
-        password = attrs.get('password')
+        password: str = attrs.get('password') or ""
 
         # Authenticate using email; fallback to username if needed
         try:
@@ -55,15 +58,31 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'User account is disabled'
             )
 
-        # Get tokens
-        refresh = self.get_token(user)
+        # Use a stable email string for claims/lookups
+        user_email: str = str(getattr(user, 'email', email) or email or "")
 
-        data = {
-            'access': str(refresh.access_token),
+        # Issue tokens and add custom claims to both refresh and access
+        refresh = RefreshToken.for_user(user)
+
+        try:
+            # Resolve canonical Supabase user UUID for this email
+            supabase_uuid = _get_supabase_user_uuid(user_email)
+            user_uuid = supabase_uuid
+        except Exception:
+            # Dev fallback: deterministic UUID derived from email for local setups
+            # Ensures consistent UUID across sessions without Supabase
+            user_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, user_email))
+
+        # Add claims to both tokens
+        access = refresh.access_token
+        for token in (refresh, access):
+            token['user_id'] = user_uuid
+            token['email'] = user_email
+
+        return {
+            'access': str(access),
             'refresh': str(refresh)
         }
-
-        return data
 
 
 class PlatformSerializer(serializers.ModelSerializer):

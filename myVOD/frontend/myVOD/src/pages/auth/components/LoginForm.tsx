@@ -52,8 +52,8 @@ export function LoginForm() {
         // Save tokens to localStorage via AuthContext
         login(tokens);
 
-        // Get redirect path from query params or default to /watchlist
-        const next = searchParams.get("next") || "/watchlist";
+        // After login, route via root so AppRoot can decide onboarding vs watchlist
+        const next = searchParams.get("next") || "/";
         navigate(next);
       },
       onError: (error: unknown) => {

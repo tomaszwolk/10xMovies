@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 import type { ReactNode } from "react";
 import type { AuthTokensDto } from "@/types/api.types";
 
@@ -21,19 +21,13 @@ const REFRESH_TOKEN_KEY = "myVOD_refresh_token";
  * Tokens are persisted in localStorage for session management.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
-
-  // Load tokens from localStorage on mount
-  useEffect(() => {
-    const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-
-    if (storedAccessToken && storedRefreshToken) {
-      setAccessToken(storedAccessToken);
-      setRefreshToken(storedRefreshToken);
-    }
-  }, []);
+  // Initialize tokens synchronously from localStorage to avoid redirect flicker
+  const [accessToken, setAccessToken] = useState<string | null>(() =>
+    localStorage.getItem(ACCESS_TOKEN_KEY)
+  );
+  const [refreshToken, setRefreshToken] = useState<string | null>(() =>
+    localStorage.getItem(REFRESH_TOKEN_KEY)
+  );
 
   const login = (tokens: AuthTokensDto) => {
     localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);

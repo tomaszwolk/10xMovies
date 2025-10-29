@@ -11,7 +11,15 @@ class MockUser:
     we don't use Django's auth_user table.
     """
     def __init__(self, user_id, email=None):
-        self.id = user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(user_id)
+        # Handle both UUID strings and regular IDs
+        if isinstance(user_id, str) and len(user_id) == 36 and '-' in user_id:
+            # It's a UUID string, convert to UUID object
+            self.id = uuid.UUID(user_id)
+        else:
+            # It's a regular ID, keep as string but create UUID-like identifier
+            # For backward compatibility, we'll create a UUID from string
+            self.id = str(user_id)  # Keep as string for now
+
         self.email = email or f"user-{user_id}@example.com"
         self.is_authenticated = True
         self.is_active = True
@@ -46,6 +54,9 @@ class UUIDJWTAuthentication(JWTAuthentication):
 
             if not user_id:
                 raise InvalidToken('Token contained no recognizable user identification')
+
+            # Debug: print user_id to see what we're getting
+            print(f"UUIDJWTAuthentication: user_id from token: {repr(user_id)}")
 
             # Create mock user with UUID
             return MockUser(user_id, email)

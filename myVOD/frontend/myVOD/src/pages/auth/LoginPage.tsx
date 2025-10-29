@@ -17,10 +17,10 @@ export function LoginPage() {
     document.title = "Logowanie - MyVOD";
   }, []);
 
-  // Redirect authenticated users to watchlist
+  // Redirect authenticated users via root gate
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/watchlist", { replace: true });
+      navigate("/", { replace: true });
     }
   }, [isAuthenticated, navigate]);
 

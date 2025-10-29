@@ -35,13 +35,17 @@ export function setupAxiosInterceptors(
     (config: InternalAxiosRequestConfig) => {
       const token = localStorage.getItem(ACCESS_TOKEN_KEY);
       
-      // Don't add token to login, register, or refresh endpoints
-      const isAuthEndpoint = 
-        config.url?.includes("/token/") || 
-        config.url?.includes("/register/");
-      
+      // Don't add token to login, register, refresh, or public endpoints
+      const isAuthEndpoint =
+        config.url?.includes("/token/") ||
+        config.url?.includes("/register/") ||
+        config.url?.includes("/platforms/");
+
       if (token && !isAuthEndpoint) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('Axios interceptor: Adding token to request:', config.url);
+      } else {
+        console.log('Axios interceptor: Not adding token to request:', config.url, 'isAuthEndpoint:', isAuthEndpoint);
       }
       
       return config;

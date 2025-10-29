@@ -1,9 +1,10 @@
 import { http } from "@/lib/http";
-import type { 
-  RegisterUserCommand, 
+import type {
+  RegisterUserCommand,
   RegisteredUserDto,
   LoginUserCommand,
-  AuthTokensDto
+  AuthTokensDto,
+  UserProfileDto
 } from "@/types/api.types";
 
 /**
@@ -44,6 +45,16 @@ export async function refreshAccessToken(
   const { data } = await http.post<{ access: string }>("/token/refresh/", {
     refresh: refreshToken,
   });
+  return data;
+}
+
+/**
+ * Get the current user's profile.
+ * @returns User profile data including selected platforms
+ * @throws API error with status and data
+ */
+export async function getUserProfile(): Promise<UserProfileDto> {
+  const { data } = await http.get<UserProfileDto>("/me/");
   return data;
 }
 

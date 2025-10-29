@@ -9,6 +9,7 @@ import logging
 from django.db import transaction, DatabaseError
 from django.contrib.auth import get_user_model
 from movies.models import Platform, UserPlatform
+from services.user_movies_service import _resolve_user_uuid
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +36,12 @@ def get_user_profile(user):
         DatabaseError: If database query fails
     """
     try:
+        # Resolve canonical Supabase user UUID (works for both UUID and int ids)
+        user_uuid = _resolve_user_uuid(user)
+
         # Get user's platform IDs
         user_platform_ids = UserPlatform.objects.filter(
-            user_id=user.id
+            user_id=user_uuid
         ).values_list('platform_id', flat=True)
 
         # Fetch platform details
@@ -91,10 +95,13 @@ def update_user_platforms(user, platform_ids: list[int]):
     """
     try:
         with transaction.atomic():
+            # Resolve canonical Supabase user UUID (works for both UUID and int ids)
+            user_uuid = _resolve_user_uuid(user)
+
             # Get current user platforms
             current_platform_ids = set(
                 UserPlatform.objects.filter(
-                    user_id=user.id
+                    user_id=user_uuid
                 ).values_list('platform_id', flat=True)
             )
 
@@ -107,7 +114,7 @@ def update_user_platforms(user, platform_ids: list[int]):
             # Delete platforms not in the new list
             if to_delete:
                 deleted_count = UserPlatform.objects.filter(
-                    user_id=user.id,
+                    user_id=user_uuid,
                     platform_id__in=to_delete
                 ).delete()[0]
 
@@ -118,7 +125,7 @@ def update_user_platforms(user, platform_ids: list[int]):
             # Insert new platforms
             if to_add:
                 new_records = [
-                    UserPlatform(user_id=user.id, platform_id=platform_id)
+                    UserPlatform(user_id=user_uuid, platform_id=platform_id)
                     for platform_id in to_add
                 ]
                 UserPlatform.objects.bulk_create(
