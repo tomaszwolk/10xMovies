@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { OnboardingLayout } from "@/components/onboarding/OnboardingLayout";
 import { ProgressBar } from "@/components/onboarding/ProgressBar";
 import { OnboardingHeader } from "@/components/onboarding/OnboardingHeader";
@@ -5,6 +6,7 @@ import { WatchedSearchCombobox } from "@/components/onboarding/WatchedSearchComb
 import { SelectedMoviesList } from "@/components/onboarding/SelectedMoviesList";
 import { OnboardingFooterNav } from "@/components/onboarding/OnboardingFooterNav";
 import { useOnboardingWatchedController } from "@/hooks/useOnboardingWatchedController";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 /**
  * Onboarding page for marking movies as watched.
@@ -14,9 +16,27 @@ import { useOnboardingWatchedController } from "@/hooks/useOnboardingWatchedCont
  */
 export function OnboardingWatchedPage() {
   const { viewModel, setQuery, pick, undo, finish, skip } = useOnboardingWatchedController();
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const errorSectionRef = useRef<HTMLDivElement>(null);
 
   const canAddMore = viewModel.selected.length < viewModel.maxSelected;
   const selectedTconsts = new Set(viewModel.selected.map(item => item.tconst));
+
+  const handleSkip = () => {
+    setValidationError(null);
+    skip();
+  };
+
+  const handleNext = () => {
+    if (viewModel.selected.length < viewModel.maxSelected) {
+      setValidationError("Oznacz 3 filmy jako obejrzane, aby zakończyć onboarding.");
+      errorSectionRef.current?.focus();
+      return;
+    }
+
+    setValidationError(null);
+    finish();
+  };
 
   return (
     <OnboardingLayout title="Oznacz filmy które już widziałeś">
@@ -51,11 +71,18 @@ export function OnboardingWatchedPage() {
         {/* Footer navigation */}
         <div className="pt-4">
           <OnboardingFooterNav
-            onSkip={skip}
-            onNext={finish}
+            onSkip={handleSkip}
+            onNext={handleNext}
           />
         </div>
       </div>
+
+      {validationError && (
+        <Alert variant="destructive" ref={errorSectionRef} tabIndex={-1} className="mt-6">
+          <AlertTitle>Brakuje filmów</AlertTitle>
+          <AlertDescription>{validationError}</AlertDescription>
+        </Alert>
+      )}
     </OnboardingLayout>
   );
 }

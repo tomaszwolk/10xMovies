@@ -9,6 +9,7 @@ import { AddedMoviesGrid } from "@/components/onboarding/AddedMoviesGrid";
 import { OnboardingFooterNav } from "@/components/onboarding/OnboardingFooterNav";
 import { useAddUserMovie } from "@/hooks/useAddUserMovie";
 import { getNextOnboardingPath, useOnboardingStatus } from "@/hooks/useOnboardingStatus";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { AddedMovieVM, SearchOptionVM } from "@/types/api.types";
 
 /**
@@ -21,6 +22,8 @@ export function OnboardingAddPage() {
   const [added, setAdded] = useState<AddedMovieVM[]>([]);
   const [addedSet, setAddedSet] = useState<Set<string>>(new Set());
   const hasPrefilledFromWatchlistRef = useRef(false);
+  const errorSectionRef = useRef<HTMLDivElement>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const addUserMovieMutation = useAddUserMovie();
   const { progress, watchlistMovies } = useOnboardingStatus();
@@ -49,6 +52,9 @@ export function OnboardingAddPage() {
 
     setAdded(prefilled);
     setAddedSet(new Set(prefilled.map((movie) => movie.tconst)));
+    if (prefilled.length >= MAX_MOVIES) {
+      setValidationError(null);
+    }
     hasPrefilledFromWatchlistRef.current = true;
   }, [watchlistMovies, MAX_MOVIES]);
 
@@ -67,7 +73,13 @@ export function OnboardingAddPage() {
         posterUrl: searchOption.posterUrl,
       };
 
-      setAdded(prev => [...prev, tempAddedMovie]);
+      setAdded(prev => {
+        const updated = [...prev, tempAddedMovie];
+        if (updated.length >= MAX_MOVIES) {
+          setValidationError(null);
+        }
+        return updated;
+      });
       setAddedSet(prev => new Set(prev).add(searchOption.tconst));
 
       // Call API
@@ -107,11 +119,17 @@ export function OnboardingAddPage() {
   const handleSkip = () => {
     // Skip to the next incomplete onboarding step (or main app if finished)
     const nextPath = getNextOnboardingPath(progress, { fromStep: "add" });
+    setValidationError(null);
     navigate(nextPath, { replace: true });
   };
 
   const handleNext = () => {
-    // Navigate to next onboarding step (watched movies)
+    if (added.length < MAX_MOVIES) {
+      setValidationError("Dodaj przynajmniej 3 filmy, aby przejść dalej.");
+      errorSectionRef.current?.focus();
+      return;
+    }
+
     const nextPath = getNextOnboardingPath(progress, { fromStep: "add" });
     navigate(nextPath, { replace: true });
   };
@@ -148,6 +166,13 @@ export function OnboardingAddPage() {
           />
         </div>
       </div>
+
+      {validationError && (
+        <Alert variant="destructive" ref={errorSectionRef} tabIndex={-1} className="mt-6">
+          <AlertTitle>Brakuje filmów</AlertTitle>
+          <AlertDescription>{validationError}</AlertDescription>
+        </Alert>
+      )}
     </OnboardingLayout>
   );
 }

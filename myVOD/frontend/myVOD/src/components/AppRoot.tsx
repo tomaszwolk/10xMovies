@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
+
+const ONBOARDING_CHECKED_KEY = "onboarding_initial_check_done";
 
 /**
  * Root component that handles initial routing based on user onboarding status.
@@ -9,6 +12,10 @@ import { useAuth } from "@/contexts/AuthContext";
 export function AppRoot() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { isLoading, requiredStep } = useOnboardingStatus();
+  const hasCompletedInitialCheck = typeof window !== "undefined"
+    ? sessionStorage.getItem(ONBOARDING_CHECKED_KEY) === "true"
+    : false;
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -17,9 +24,24 @@ export function AppRoot() {
       return;
     }
 
-    // Authenticated users land on watchlist (OnboardingGuard can still redirect once if needed)
+    if (hasCompletedInitialCheck) {
+      navigate('/watchlist', { replace: true });
+      return;
+    }
+
+    if (isLoading) {
+      // Wait for onboarding status to resolve
+      return;
+    }
+
+    // Navigate to first incomplete step or watchlist if onboarding done
+    if (requiredStep) {
+      navigate(requiredStep, { replace: true });
+      return;
+    }
+
     navigate('/watchlist', { replace: true });
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, hasCompletedInitialCheck, isLoading, requiredStep, navigate]);
 
   // While redirecting, show a loading state
   return (
