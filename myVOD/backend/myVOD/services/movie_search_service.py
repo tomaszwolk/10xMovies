@@ -81,8 +81,7 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
             '-start_year'
         ).prefetch_related('availability_entries')[:limit]
 
-        result_count = queryset.count()
-        logger.info(f"Found {result_count} movies matching query '{search_query}' (accent-insensitive)")
+        logger.info(f"Searching movies matching query '{search_query}' (accent-insensitive)")
         return queryset
 
     except Exception:
@@ -105,10 +104,5 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
             '-start_year'
         ).prefetch_related('availability_entries')[:limit]
 
-        # Don't count again if DB might still not support trigram; but we attempt for logging
-        try:
-            result_count = queryset.count()
-            logger.info(f"Found {result_count} movies matching query '{search_query}' (fallback)")
-        except Exception:
-            logger.info("Search fallback executed; unable to count results due to DB limitations")
+        logger.info(f"Searching movies matching query '{search_query}' (fallback)")
         return queryset

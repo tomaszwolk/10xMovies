@@ -96,7 +96,7 @@ export function RegisterForm() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {/* Global Error Alert */}
-        <ErrorAlert message={serverError} />
+        <ErrorAlert message={serverError ?? undefined} />
 
         {/* Email Field */}
         <FormField

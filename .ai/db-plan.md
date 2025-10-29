@@ -64,13 +64,15 @@ Tracks a user's interaction with a movie (watchlist, watched history).
 | Column | Data Type | Constraints | Description |
 |---|---|---|---|
 | `id` | `bigint` | **Primary Key**, Identity | Unique identifier for the interaction. |
-| `user_id` | `uuid` | **Foreign Key** -> `public.users_user(id)` ON DELETE CASCADE, Not Null | The user associated with this interaction. |
+| `user_id` | `uuid` | **Foreign Key** -> `public.users_user(id)` ON DELETE CASCADE, Not Null | The user associated with this interaction. References Django User table. |
 | `tconst` | `text` | **Foreign Key** -> `movie(tconst)` ON DELETE CASCADE, Not Null | The movie associated with this interaction. |
 | `watchlisted_at`| `timestamptz` | | Timestamp when the movie was added to the watchlist. |
 | `watchlist_deleted_at`| `timestamptz` | | Timestamp for soft-deleting from the watchlist. |
 | `watched_at` | `timestamptz` | | Timestamp when the user marked the movie as watched. |
 | `added_from_ai_suggestion`| `boolean` | Not Null, `default false` | Flag indicating if it was added from an AI suggestion. |
 | | | **Unique** (`user_id`, `tconst`) | Ensures a single interaction record per user per movie. |
+
+**Important:** The `user_id` foreign key must reference `public.users_user(id)` (Django User table), NOT `auth.users` (Supabase Auth table). This was corrected from the initial migration.
 
 ---
 
@@ -189,6 +191,26 @@ The following PostgreSQL extensions need to be enabled:
 - **Soft Deletes**: The `user_movie` table uses a `watchlist_deleted_at` timestamp for soft-deleting items from a user's watchlist, preserving history.
 - **Region**: All availability data is for the 'PL' (Poland) region in the MVP. This is handled in the application logic, not with a dedicated column.
 - **External ID Mapping**: Mappings between external service names (e.g., Watchmode's "HBO Max") and internal `platform_slug` values (e.g., "hbomax") are managed in the Django `settings.py` file under the `VOD_PLATFORMS` dictionary. This allows for flexible integration without hardcoding values in the business logic.
+
+### Migration Notes
+
+**Foreign Key Correction (user_movie.user_id):**
+During initial setup, the `user_movie` table's foreign key constraint may have been created pointing to `auth.users` (Supabase Auth). This must be corrected to point to `public.users_user` (Django User table):
+
+```sql
+-- Remove incorrect foreign key constraint
+ALTER TABLE public.user_movie 
+DROP CONSTRAINT IF EXISTS user_movie_user_id_fkey;
+
+-- Add correct foreign key constraint
+ALTER TABLE public.user_movie 
+ADD CONSTRAINT user_movie_user_id_fkey 
+FOREIGN KEY (user_id) 
+REFERENCES public.users_user(id) 
+ON DELETE CASCADE;
+```
+
+This ensures that user_movie records are properly linked to Django-managed users, not Supabase Auth users.
 
 ---
 

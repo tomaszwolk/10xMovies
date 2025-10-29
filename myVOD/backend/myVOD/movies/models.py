@@ -60,7 +60,8 @@ class UserMovie(models.Model):
     class Meta:
         managed = False
         db_table = 'user_movie'
-        unique_together = (('user_id', 'tconst'),)
+        # Note: unique constraint on (user_id, tconst) is enforced at database level
+        # Don't define unique_together here as it can cause issues with managed=False
 
 
 class MovieAvailability(models.Model):

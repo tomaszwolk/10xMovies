@@ -44,7 +44,7 @@ export function OnboardingPlatformsPage() {
       // Invalidate and refetch user profile queries
       queryClient.invalidateQueries({ queryKey: ['user-profile'] });
       // Navigate to next step
-      navigate('/onboarding/first-movies');
+      navigate('/onboarding/add');
     },
     onError: (error: any) => {
       console.log('OnboardingPlatformsPage: Mutation error:', error);

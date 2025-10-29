@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { http } from '@/lib/http'
 import { setupAxiosInterceptors } from '@/lib/axios-interceptors'
+import { Toaster } from '@/components/ui/sonner'
 import './index.css'
 import { router } from './router'
 
@@ -33,6 +34,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <RouterProvider router={router} />
+        <Toaster />
       </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,

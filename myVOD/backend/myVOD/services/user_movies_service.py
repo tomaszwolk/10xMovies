@@ -1,8 +1,11 @@
+import logging
 from django.db.models import Prefetch, Exists, OuterRef
 from django.db import transaction
 from django.utils import timezone
 from movies.models import UserMovie, MovieAvailability, UserPlatform, Movie  # type: ignore
 import uuid
+
+logger = logging.getLogger(__name__)
 
 
 def _get_user_platform_ids(user_id):
@@ -138,37 +141,48 @@ def add_movie_to_watchlist(*, user, tconst: str):
     """
     # Resolve canonical user UUID for the user
     supabase_user_uuid = _resolve_user_uuid(user)
+    
+    logger.info(f"Adding movie to watchlist: user_id={supabase_user_uuid}, tconst={tconst}")
 
     # Guard clause: Validate movie exists
     if not Movie.objects.filter(tconst=tconst).exists():
         raise Movie.DoesNotExist(f"Movie with tconst '{tconst}' does not exist in database")
 
-    # Guard clause: Check for duplicate active watchlist entry
-    existing_active = UserMovie.objects.filter(
+    # Guard clause: Check for ANY existing entry (active OR soft-deleted)
+    # This prevents IntegrityError on unique constraint (user_id, tconst)
+    existing_entry = UserMovie.objects.filter(
         user_id=supabase_user_uuid,
-        tconst=tconst,
-        watchlisted_at__isnull=False,
-        watchlist_deleted_at__isnull=True
+        tconst=tconst
     ).first()
 
-    if existing_active:
-        raise ValueError("Movie is already on the watchlist")
-
-    # Check if soft-deleted entry exists (restore it)
-    soft_deleted = UserMovie.objects.filter(
-        user_id=supabase_user_uuid,
-        tconst=tconst,
-        watchlist_deleted_at__isnull=False
-    ).first()
-
-    if soft_deleted:
-        # Restore soft-deleted entry
-        soft_deleted.watchlisted_at = timezone.now()
-        soft_deleted.watchlist_deleted_at = None
-        soft_deleted.save()
-        user_movie = soft_deleted
+    if existing_entry:
+        # Check if it's an active watchlist entry
+        is_active = (
+            existing_entry.watchlisted_at is not None and 
+            existing_entry.watchlist_deleted_at is None
+        )
+        
+        logger.info(f"Found existing user_movie id={existing_entry.id}, is_active={is_active}")
+        
+        if is_active:
+            raise ValueError("Movie is already on the watchlist")
+        
+        # Entry exists but is soft-deleted or incomplete - restore it
+        if existing_entry.watchlist_deleted_at is not None:
+            logger.info(f"Restoring soft-deleted user_movie id={existing_entry.id}")
+            existing_entry.watchlisted_at = timezone.now()
+            existing_entry.watchlist_deleted_at = None
+            existing_entry.save(update_fields=['watchlisted_at', 'watchlist_deleted_at'])
+            user_movie = existing_entry
+        else:
+            # Entry exists but watchlisted_at is NULL - set it now
+            logger.info(f"Updating incomplete user_movie id={existing_entry.id}")
+            existing_entry.watchlisted_at = timezone.now()
+            existing_entry.save(update_fields=['watchlisted_at'])
+            user_movie = existing_entry
     else:
-        # Create new entry
+        # No existing entry - create new one
+        logger.info(f"Creating new user_movie for user_id={supabase_user_uuid}, tconst={tconst}")
         user_movie = UserMovie.objects.create(
             user_id=supabase_user_uuid,
             tconst_id=tconst,
@@ -177,6 +191,7 @@ def add_movie_to_watchlist(*, user, tconst: str):
             watched_at=None,
             added_from_ai_suggestion=False
         )
+        logger.info(f"Created new user_movie with id={user_movie.id}")
 
     # Fetch with related data for response
     platform_ids = _get_user_platform_ids(supabase_user_uuid)

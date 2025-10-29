@@ -4,6 +4,7 @@ import { LoginPage } from "@/pages/auth/LoginPage";
 import { WatchlistPage } from "@/pages/WatchlistPage";
 import { OnboardingPlatformsPage } from "@/pages/onboarding";
 import { OnboardingFirstMoviesPage } from "@/pages/onboarding/OnboardingFirstMoviesPage";
+import { OnboardingAddPage } from "@/pages/onboarding/OnboardingAddPage";
 import { AppRoot } from "@/components/AppRoot";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -73,6 +74,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <OnboardingFirstMoviesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "add",
+        element: (
+          <ProtectedRoute>
+            <OnboardingAddPage />
           </ProtectedRoute>
         ),
       },
