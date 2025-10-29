@@ -118,43 +118,20 @@ export function useOnboardingWatchedController() {
       let userMovieId: number | null = null;
       let source: SelectedSource = 'newly_created';
 
-      // Step 1: Try to add to watchlist (POST)
       try {
-        const result: UserMovieDto = await addUserMovieMutation.mutateAsync({ tconst: movie.tconst });
-        userMovieId = result.id;
-        source = 'newly_created';
-      } catch (error: any) {
-        // Handle 409 - movie already on watchlist
-        if (error?.status === 409) {
-          // Lookup userMovieId from watchlist
-          const watchlist: UserMovieDto[] = await listUserMovies('watchlist');
-          const existing = watchlist.find(m => m.movie.tconst === movie.tconst);
-          
-          if (existing) {
-            userMovieId = existing.id;
-            source = 'preexisting_watchlist';
-          } else {
-            throw new Error("Nie znaleziono filmu na watchliście mimo 409");
-          }
-        } else {
-          // Other errors - rethrow
-          throw error;
-        }
-      }
-
-      // Guard: verify we have userMovieId
-      if (!userMovieId) {
-        throw new Error("Nie udało się pobrać ID filmu");
-      }
-
-      // Step 2: Mark as watched (PATCH)
-      try {
-        await patchUserMovieMutation.mutateAsync({
-          id: userMovieId,
-          command: { action: 'mark_as_watched' },
+        const result: UserMovieDto = await addUserMovieMutation.mutateAsync({
+          tconst: movie.tconst,
+          mark_as_watched: true,
         });
 
-        // Success - update item state
+        userMovieId = result.id;
+
+        if (result.watchlisted_at) {
+          source = 'preexisting_watchlist';
+        } else {
+          source = 'newly_created';
+        }
+
         setSelected(prev =>
           prev.map(item =>
             item.tconst === movie.tconst
@@ -165,16 +142,13 @@ export function useOnboardingWatchedController() {
 
         toast.success(`"${movie.primaryTitle}" oznaczono jako obejrzany`);
 
-      } catch (patchError: any) {
-        // Handle 400 - already watched
-        if (patchError?.status === 400) {
-          // Movie is already marked as watched - treat as success
-          // Lookup userMovieId from watched list
+      } catch (error: any) {
+        if (error?.status === 409) {
           const watched: UserMovieDto[] = await listUserMovies('watched');
-          const existing = watched.find(m => m.movie.tconst === movie.tconst);
-          
-          if (existing) {
-            userMovieId = existing.id;
+          const existingWatched = watched.find(m => m.movie.tconst === movie.tconst);
+
+          if (existingWatched) {
+            userMovieId = existingWatched.id;
             source = 'preexisting_watched';
 
             setSelected(prev =>
@@ -187,11 +161,10 @@ export function useOnboardingWatchedController() {
 
             toast.info(`"${movie.primaryTitle}" był już oznaczony jako obejrzany`);
           } else {
-            throw new Error("Nie znaleziono filmu na liście obejrzanych mimo 400");
+            throw new Error("Nie znaleziono filmu na liście obejrzanych mimo 409");
           }
         } else {
-          // Other patch errors - rethrow
-          throw patchError;
+          throw error;
         }
       }
 

@@ -12,6 +12,7 @@ from .serializers import (
 from services.user_movies_service import (  # type: ignore
     build_user_movies_queryset,
     add_movie_to_watchlist,
+    add_movie_as_watched,
     update_user_movie,
     delete_user_movie_soft
 )
@@ -137,17 +138,26 @@ class UserMovieViewSet(viewsets.ModelViewSet):
             return Response(command_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         tconst = command_serializer.validated_data['tconst']
+        mark_as_watched = command_serializer.validated_data.get('mark_as_watched', False)
 
         try:
             # Use service layer for business logic
-            user_movie = add_movie_to_watchlist(
-                user=request.user,
-                tconst=tconst
-            )
+            if mark_as_watched:
+                user_movie, created = add_movie_as_watched(
+                    user=request.user,
+                    tconst=tconst
+                )
+                status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            else:
+                user_movie = add_movie_to_watchlist(
+                    user=request.user,
+                    tconst=tconst
+                )
+                status_code = status.HTTP_201_CREATED
 
             # Serialize and return response
             serializer = self.get_serializer(user_movie)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.data, status=status_code)
 
         except Movie.DoesNotExist:
             logger.info(
@@ -159,9 +169,8 @@ class UserMovieViewSet(viewsets.ModelViewSet):
             )
 
         except ValueError as e:
-            # Business rule violation (duplicate watchlist entry)
             logger.info(
-                f"Duplicate watchlist attempt for user {request.user.id}: {tconst}"
+                f"Business rule violation for user {request.user.id} during POST user-movies: {tconst} ({str(e)})"
             )
             return Response(
                 {"detail": str(e)},

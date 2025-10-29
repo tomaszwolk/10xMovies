@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { OnboardingLayout } from "@/components/onboarding/OnboardingLayout";
@@ -10,6 +11,7 @@ import { OnboardingFooterNav } from "@/components/onboarding/OnboardingFooterNav
 import { useAddUserMovie } from "@/hooks/useAddUserMovie";
 import { getNextOnboardingPath, useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { deleteUserMovie } from "@/lib/api/movies";
 import type { AddedMovieVM, SearchOptionVM } from "@/types/api.types";
 
 /**
@@ -21,12 +23,14 @@ export function OnboardingAddPage() {
   const navigate = useNavigate();
   const [added, setAdded] = useState<AddedMovieVM[]>([]);
   const [addedSet, setAddedSet] = useState<Set<string>>(new Set());
+  const [removingTconsts, setRemovingTconsts] = useState<Set<string>>(new Set());
   const hasPrefilledFromWatchlistRef = useRef(false);
   const errorSectionRef = useRef<HTMLDivElement>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const addUserMovieMutation = useAddUserMovie();
   const { progress, watchlistMovies } = useOnboardingStatus();
+  const queryClient = useQueryClient();
 
   const MAX_MOVIES = 3;
   const canAddMore = added.length < MAX_MOVIES;
@@ -44,6 +48,7 @@ export function OnboardingAddPage() {
     const prefilled = watchlistMovies
       .slice(0, MAX_MOVIES)
       .map<AddedMovieVM>((movie) => ({
+        userMovieId: movie.id,
         tconst: movie.movie.tconst,
         primaryTitle: movie.movie.primary_title,
         startYear: movie.movie.start_year,
@@ -67,6 +72,7 @@ export function OnboardingAddPage() {
     try {
       // Add to pending state immediately for UI feedback
       const tempAddedMovie: AddedMovieVM = {
+        userMovieId: null,
         tconst: searchOption.tconst,
         primaryTitle: searchOption.primaryTitle,
         startYear: searchOption.startYear,
@@ -83,7 +89,13 @@ export function OnboardingAddPage() {
       setAddedSet(prev => new Set(prev).add(searchOption.tconst));
 
       // Call API
-      await addUserMovieMutation.mutateAsync({ tconst: searchOption.tconst });
+      const savedMovie = await addUserMovieMutation.mutateAsync({ tconst: searchOption.tconst });
+
+      setAdded(prev =>
+        prev.map(movie =>
+          movie.tconst === searchOption.tconst ? savedMovie : movie
+        )
+      );
 
       // Success toast
       toast.success(`"${searchOption.primaryTitle}" został dodany do Twojej watchlisty`);
@@ -113,6 +125,52 @@ export function OnboardingAddPage() {
         toast.error("Wystąpił błąd podczas dodawania filmu");
       }
 
+    }
+  };
+
+  const handleRemoveMovie = async (movie: AddedMovieVM) => {
+    if (removingTconsts.has(movie.tconst)) {
+      return;
+    }
+
+    setRemovingTconsts(prev => {
+      const updated = new Set(prev);
+      updated.add(movie.tconst);
+      return updated;
+    });
+
+    try {
+      if (movie.userMovieId) {
+        await deleteUserMovie(movie.userMovieId);
+      }
+
+      setAdded(prev => prev.filter(item => item.tconst !== movie.tconst));
+      setAddedSet(prev => {
+        const updated = new Set(prev);
+        updated.delete(movie.tconst);
+        return updated;
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ["user-movies"] });
+
+      toast.success(`"${movie.primaryTitle}" został usunięty z watchlisty`);
+    } catch (error: any) {
+      if (error?.status === 401 || error?.status === 403) {
+        navigate('/auth/login');
+        return;
+      }
+
+      if (error?.status >= 500) {
+        toast.error("Wystąpił błąd serwera. Spróbuj ponownie później");
+      } else {
+        toast.error("Nie udało się usunąć filmu");
+      }
+    } finally {
+      setRemovingTconsts(prev => {
+        const updated = new Set(prev);
+        updated.delete(movie.tconst);
+        return updated;
+      });
     }
   };
 
@@ -155,7 +213,11 @@ export function OnboardingAddPage() {
 
         {/* Added movies grid */}
         <div className="max-w-lg mx-auto">
-          <AddedMoviesGrid items={added} />
+          <AddedMoviesGrid
+            items={added}
+            onRemove={handleRemoveMovie}
+            removingTconsts={removingTconsts}
+          />
         </div>
 
         {/* Footer navigation */}

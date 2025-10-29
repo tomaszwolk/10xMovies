@@ -7,13 +7,15 @@ import type { AddedMovieVM } from "@/types/api.types";
  */
 type AddedMoviesGridProps = {
   items: AddedMovieVM[];
+  onRemove: (item: AddedMovieVM) => void;
+  removingTconsts?: Set<string>;
 };
 
 /**
  * Responsive grid displaying added movies in the onboarding session.
  * Shows up to 3 movie cards in a responsive layout.
  */
-export function AddedMoviesGrid({ items }: AddedMoviesGridProps) {
+export function AddedMoviesGrid({ items, onRemove, removingTconsts }: AddedMoviesGridProps) {
   if (items.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -40,7 +42,11 @@ export function AddedMoviesGrid({ items }: AddedMoviesGridProps) {
             key={item.tconst}
             className="bg-card border rounded-lg p-3 shadow-sm"
           >
-            <AddedMovieCard item={item} />
+            <AddedMovieCard
+              item={item}
+              onRemove={() => onRemove(item)}
+              isRemoving={removingTconsts?.has(item.tconst) ?? false}
+            />
           </div>
         ))}
 

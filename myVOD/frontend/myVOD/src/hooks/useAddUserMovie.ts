@@ -7,6 +7,7 @@ import type { AddUserMovieCommand, UserMovieDto, AddedMovieVM } from "@/types/ap
  */
 function mapToAddedMovieVM(dto: UserMovieDto): AddedMovieVM {
   return {
+    userMovieId: dto.id,
     tconst: dto.movie.tconst,
     primaryTitle: dto.movie.primary_title,
     startYear: dto.movie.start_year,

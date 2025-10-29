@@ -69,6 +69,7 @@ class AddUserMovieCommandSerializer(serializers.Serializer):
             'invalid': 'Invalid tconst format. Expected format: tt followed by 7-8 digits (e.g., tt0816692)'
         }
     )
+    mark_as_watched = serializers.BooleanField(required=False, default=False)
 
 
 class UpdateUserMovieCommandSerializer(serializers.Serializer):

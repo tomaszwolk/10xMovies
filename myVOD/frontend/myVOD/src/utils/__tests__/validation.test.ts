@@ -3,6 +3,7 @@ import type { AddedMovieVM, SearchOptionVM } from '@/types/api.types';
 
 describe('OnboardingAdd Validation Logic', () => {
   const createMockAddedMovie = (tconst: string): AddedMovieVM => ({
+    userMovieId: 1,
     tconst,
     primaryTitle: `Movie ${tconst}`,
     startYear: 2020,

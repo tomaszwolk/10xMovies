@@ -79,6 +79,7 @@ export type UserMovieDto = {
 
 export type AddUserMovieCommand = {
   tconst: string;
+  mark_as_watched?: boolean;
 };
 
 export type UpdateUserMovieCommand = {
@@ -113,6 +114,7 @@ export type AddedMovieVM = {
   primaryTitle: string;
   startYear: number | null;
   posterUrl: string | null;
+  userMovieId: number | null;
 };
 
 export type OnboardingAddState = {

@@ -141,7 +141,7 @@ def add_movie_to_watchlist(*, user, tconst: str):
     """
     # Resolve canonical user UUID for the user
     supabase_user_uuid = _resolve_user_uuid(user)
-    
+
     logger.info(f"Adding movie to watchlist: user_id={supabase_user_uuid}, tconst={tconst}")
 
     # Guard clause: Validate movie exists
@@ -158,15 +158,15 @@ def add_movie_to_watchlist(*, user, tconst: str):
     if existing_entry:
         # Check if it's an active watchlist entry
         is_active = (
-            existing_entry.watchlisted_at is not None and 
+            existing_entry.watchlisted_at is not None and
             existing_entry.watchlist_deleted_at is None
         )
-        
+
         logger.info(f"Found existing user_movie id={existing_entry.id}, is_active={is_active}")
-        
+
         if is_active:
             raise ValueError("Movie is already on the watchlist")
-        
+
         # Entry exists but is soft-deleted or incomplete - restore it
         if existing_entry.watchlist_deleted_at is not None:
             logger.info(f"Restoring soft-deleted user_movie id={existing_entry.id}")
@@ -214,6 +214,69 @@ def add_movie_to_watchlist(*, user, tconst: str):
     )
 
     return user_movie
+
+
+@transaction.atomic
+def add_movie_as_watched(*, user, tconst: str):
+    """Add or update a movie as watched without affecting watchlisted_at when not needed."""
+
+    supabase_user_uuid = _resolve_user_uuid(user)
+
+    logger.info(f"Marking movie as watched: user_id={supabase_user_uuid}, tconst={tconst}")
+
+    if not Movie.objects.filter(tconst=tconst).exists():
+        raise Movie.DoesNotExist(f"Movie with tconst '{tconst}' does not exist in database")
+
+    existing_entry = UserMovie.objects.filter(
+        user_id=supabase_user_uuid,
+        tconst=tconst
+    ).first()
+
+    created = False
+
+    if existing_entry:
+        if existing_entry.watched_at is not None:
+            raise ValueError("Movie is already marked as watched")
+
+        update_fields = ['watched_at']
+        existing_entry.watched_at = timezone.now()
+
+        if existing_entry.watchlist_deleted_at is not None:
+            existing_entry.watchlist_deleted_at = None
+            update_fields.append('watchlist_deleted_at')
+
+        existing_entry.save(update_fields=update_fields)
+        user_movie = existing_entry
+    else:
+        user_movie = UserMovie.objects.create(
+            user_id=supabase_user_uuid,
+            tconst_id=tconst,
+            watchlisted_at=None,
+            watchlist_deleted_at=None,
+            watched_at=timezone.now(),
+            added_from_ai_suggestion=False
+        )
+        created = True
+
+    platform_ids = _get_user_platform_ids(supabase_user_uuid)
+
+    availability_prefetch = Prefetch(
+        'tconst__availability_entries',
+        queryset=MovieAvailability.objects.filter(
+            platform_id__in=platform_ids
+        ).select_related('platform'),
+        to_attr='availability_filtered'
+    )
+
+    user_movie = (
+        UserMovie.objects
+        .filter(id=user_movie.id)
+        .select_related('tconst')
+        .prefetch_related(availability_prefetch)
+        .first()
+    )
+
+    return user_movie, created
 
 
 @transaction.atomic
