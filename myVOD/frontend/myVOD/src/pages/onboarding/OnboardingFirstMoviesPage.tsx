@@ -13,8 +13,8 @@ export function OnboardingFirstMoviesPage() {
   const navigate = useNavigate();
 
   const handleSkip = () => {
-    // Navigate to final step or main app
-    navigate('/watchlist');
+    // Skip to main app (soft guard allows this)
+    navigate("/");
   };
 
   const handleNext = () => {

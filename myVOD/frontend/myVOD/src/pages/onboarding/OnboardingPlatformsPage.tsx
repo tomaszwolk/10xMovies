@@ -9,6 +9,7 @@ import { ActionBar } from "@/components/onboarding/ActionBar";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getPlatforms, patchUserPlatforms } from "@/lib/api/platforms";
+import { getNextOnboardingPath, useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 
 /**
  * Onboarding page for selecting VOD platforms.
@@ -20,12 +21,18 @@ export function OnboardingPlatformsPage() {
 
   // Refs for focus management
   const errorSectionRef = useRef<HTMLDivElement>(null);
+  const hasPrefilledSelectionRef = useRef(false);
 
   // Local state for selected platform IDs
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   // Local state for validation errors
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const {
+    progress,
+    profile,
+  } = useOnboardingStatus();
 
   // Fetch platforms
   const {
@@ -43,8 +50,16 @@ export function OnboardingPlatformsPage() {
     onSuccess: () => {
       // Invalidate and refetch user profile queries
       queryClient.invalidateQueries({ queryKey: ['user-profile'] });
-      // Navigate to next step
-      navigate('/onboarding/add');
+      // Navigate to next relevant step based on current progress
+      const nextPath = getNextOnboardingPath(
+        {
+          hasPlatforms: true,
+          hasWatchlistMovies: progress.hasWatchlistMovies,
+          hasWatchedMovies: progress.hasWatchedMovies,
+        },
+        { fromStep: 'platforms' }
+      );
+      navigate(nextPath, { replace: true });
     },
     onError: (error: any) => {
       console.log('OnboardingPlatformsPage: Mutation error:', error);
@@ -88,6 +103,21 @@ export function OnboardingPlatformsPage() {
       errorSectionRef.current.focus();
     }
   }, [platformsError, mutation.error]);
+
+  // Prefill selected IDs from user profile (if available)
+  useEffect(() => {
+    if (!profile?.platforms) {
+      return;
+    }
+
+    if (hasPrefilledSelectionRef.current) {
+      return;
+    }
+
+    const initialIds = profile.platforms.map((platform) => platform.id);
+    setSelectedIds(new Set(initialIds));
+    hasPrefilledSelectionRef.current = true;
+  }, [profile]);
 
   // Toggle platform selection
   const togglePlatform = (id: number) => {
@@ -135,7 +165,11 @@ export function OnboardingPlatformsPage() {
 
   // Handle skip button click
   const handleSkip = () => {
-    navigate('/onboarding/first-movies');
+    const nextPath = getNextOnboardingPath(progress, { fromStep: 'platforms' });
+    console.log("[OnboardingPlatforms] 🏃 Skip button clicked - navigating to", nextPath);
+    // Skip to the next incomplete onboarding step (or main app if finished)
+    navigate(nextPath, { replace: true });
+    console.log("[OnboardingPlatforms] ✅ navigate() called");
   };
 
   // Map platforms to view models

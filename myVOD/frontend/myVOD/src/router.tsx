@@ -2,10 +2,9 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { WatchlistPage } from "@/pages/WatchlistPage";
-import { OnboardingPlatformsPage } from "@/pages/onboarding";
-import { OnboardingFirstMoviesPage } from "@/pages/onboarding/OnboardingFirstMoviesPage";
-import { OnboardingAddPage } from "@/pages/onboarding/OnboardingAddPage";
+import { OnboardingPlatformsPage, OnboardingFirstMoviesPage, OnboardingAddPage, OnboardingWatchedPage } from "@/pages/onboarding";
 import { AppRoot } from "@/components/AppRoot";
+import { OnboardingGuard } from "@/components/OnboardingGuard";
 import { useAuth } from "@/contexts/AuthContext";
 
 /**
@@ -23,22 +22,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Protected layout with OnboardingGuard.
+ * This ensures OnboardingGuard is mounted only once for all protected routes.
+ */
+function ProtectedLayout() {
+  console.log("[ProtectedLayout] 🏗️ Rendering");
+  return (
+    <ProtectedRoute>
+      <OnboardingGuard>
+        <Outlet />
+      </OnboardingGuard>
+    </ProtectedRoute>
+  );
+}
+
+/**
  * Application router configuration.
  * Defines all routes and their corresponding components.
  */
 export const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <AppRoot />,
-  },
-  {
-    path: "/watchlist",
-    element: (
-      <ProtectedRoute>
-        <WatchlistPage />
-      </ProtectedRoute>
-    ),
-  },
   {
     path: "/auth",
     element: <Outlet />,
@@ -54,36 +56,41 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/onboarding",
-    element: <Outlet />,
+    path: "/",
+    element: <ProtectedLayout />,
     children: [
       {
         index: true,
-        element: <Navigate to="/onboarding/platforms" replace />,
+        element: <AppRoot />,
       },
       {
-        path: "platforms",
-        element: (
-          <ProtectedRoute>
-            <OnboardingPlatformsPage />
-          </ProtectedRoute>
-        ),
+        path: "watchlist",
+        element: <WatchlistPage />,
       },
       {
-        path: "first-movies",
-        element: (
-          <ProtectedRoute>
-            <OnboardingFirstMoviesPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "add",
-        element: (
-          <ProtectedRoute>
-            <OnboardingAddPage />
-          </ProtectedRoute>
-        ),
+        path: "onboarding",
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/onboarding/platforms" replace />,
+          },
+          {
+            path: "platforms",
+            element: <OnboardingPlatformsPage />,
+          },
+          {
+            path: "first-movies",
+            element: <OnboardingFirstMoviesPage />,
+          },
+          {
+            path: "add",
+            element: <OnboardingAddPage />,
+          },
+          {
+            path: "watched",
+            element: <OnboardingWatchedPage />,
+          },
+        ],
       },
     ],
   },

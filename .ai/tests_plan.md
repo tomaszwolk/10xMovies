@@ -1799,6 +1799,478 @@ export function createMockAxios(): AxiosInstance {
 
 ---
 
+---
+
+## Etap: Onboarding Watched View (Krok 3/3)
+
+### Status implementacji: ✅ GOTOWE DO PRODUKCJI
+### Status testów: ❌ NIE ZAIMPLEMENTOWANE
+
+**Opis:** Trzeci i ostatni krok onboardingu pozwalający użytkownikowi oznaczyć 0-3 filmów jako obejrzane. Użytkownik wyszukuje filmy przez autocomplete i aplikacja dodaje je do watchlisty (jeśli potrzeba) oraz oznacza jako obejrzane.
+
+**Komponenty do przetestowania:**
+- `OnboardingWatchedPage` - główny kontener strony
+- `WatchedSearchCombobox` - wyszukiwarka z autocomplete
+- `SelectedMoviesList` - lista oznaczonych filmów z statusami
+- `SelectedMovieItem` - pojedynczy film ze statusem i przyciskiem undo
+- `useOnboardingWatchedController` - kontroler zarządzający całym flow
+
+**Nowe endpointy API:**
+- `PATCH /api/user-movies/:id` - oznaczanie jako obejrzany
+- `DELETE /api/user-movies/:id` - soft delete
+- `GET /api/user-movies?status=watchlist|watched` - lookup po 409/400
+
+---
+
+### ❌ NIEZAIMPLEMENTOWANE TESTY
+
+#### 1. 🔴 HIGH - Hook: `useOnboardingWatchedController`
+
+**Plik:** `src/hooks/__tests__/useOnboardingWatchedController.test.ts`
+
+**Dependencies:**
+```bash
+npm install --save-dev @testing-library/react-hooks
+npm install --save-dev msw
+```
+
+**Testy do zaimplementowania:**
+```typescript
+// Setup
+✅ should initialize with empty state
+  - query = ""
+  - selected = []
+  - isSubmitting = false
+  - maxSelected = 3
+
+// pick() - Happy path
+✅ should add movie to selected with loading status
+  - Wywołaj pick(movie)
+  - Sprawdź że film jest w selected ze statusem 'loading'
+  
+✅ should call POST /api/user-movies with tconst
+  - Mock POST 201 → UserMovieDto
+  - Sprawdź że userMovieId jest ustawiony
+  - Sprawdź że status zmienia się na 'success'
+  
+✅ should call PATCH mark_as_watched after successful POST
+  - Mock POST 201, PATCH 200
+  - Sprawdź kolejność wywołań
+  - Sprawdź że status kończy na 'success'
+  
+✅ should show success toast after marking as watched
+  - Sprawdź że toast.success został wywołany z nazwą filmu
+
+// pick() - 409 Conflict (already on watchlist)
+✅ should handle 409 by looking up userMovieId from watchlist
+  - Mock POST 409
+  - Mock GET /api/user-movies?status=watchlist → [UserMovieDto]
+  - Sprawdź że PATCH jest wywoływany z lookup id
+  - Sprawdź source = 'preexisting_watchlist'
+  
+✅ should throw error if lookup fails after 409
+  - Mock POST 409
+  - Mock GET zwraca [] (nie znaleziono)
+  - Sprawdź że film usuwa się z selected
+  - Sprawdź error toast
+
+// pick() - 400 Already watched
+✅ should handle 400 by looking up from watched list
+  - Mock POST 201, PATCH 400
+  - Mock GET /api/user-movies?status=watched → [UserMovieDto]
+  - Sprawdź source = 'preexisting_watched'
+  - Sprawdź info toast "był już oznaczony"
+
+// pick() - Guards
+✅ should not add movie if limit reached (3/3)
+  - Dodaj 3 filmy
+  - Spróbuj dodać 4. film
+  - Sprawdź info toast "maksymalnie 3"
+  - Sprawdź że selected.length === 3
+  
+✅ should not add duplicate movie
+  - Dodaj film
+  - Spróbuj dodać ten sam film
+  - Sprawdź info toast "już wybrany"
+
+// pick() - Errors
+✅ should remove movie from selected on error
+  - Mock POST error 500
+  - Sprawdź że film usuwa się z selected
+  - Sprawdź error toast
+  
+✅ should handle network errors
+  - Mock network failure
+  - Sprawdź rollback
+
+// undo() - Newly created
+✅ should DELETE newly created movie
+  - Dodaj film (source = 'newly_created')
+  - Wywołaj undo()
+  - Sprawdź DELETE /api/user-movies/:id
+  - Sprawdź toast "Anulowano oznaczenie"
+  - Sprawdź że film usuwa się z selected
+  
+// undo() - Preexisting
+✅ should PATCH restore_to_watchlist for preexisting movies
+  - Symuluj film z source = 'preexisting_watchlist'
+  - Wywołaj undo()
+  - Sprawdź PATCH z action='restore_to_watchlist'
+  - Sprawdź toast "przywrócono do watchlisty"
+
+// undo() - Errors
+✅ should handle undo errors gracefully
+  - Mock DELETE error
+  - Sprawdź że status wraca do 'success'
+  - Sprawdź error toast
+
+// finish() & skip()
+✅ should set onboardingComplete and navigate to /
+  - Wywołaj finish()
+  - Sprawdź localStorage.setItem('onboardingComplete', 'true')
+  - Sprawdź navigate('/')
+  - Sprawdź success toast
+  
+✅ should skip navigate to / without marking movies
+  - Wywołaj skip()
+  - Sprawdź onboardingComplete = true
+  - Sprawdź navigate('/')
+```
+
+**Priority:** 🔴 HIGH - Najważniejszy komponent, złożona logika
+
+**Estymacja:** 4-5h (bardzo złożony flow!)
+
+---
+
+#### 2. 🔴 HIGH - Component: `WatchedSearchCombobox`
+
+**Plik:** `src/components/onboarding/__tests__/WatchedSearchCombobox.test.tsx`
+
+**Testy do zaimplementowania:**
+```typescript
+✅ should render search input with correct placeholder
+  - Sprawdź placeholder "Szukaj filmów..."
+  
+✅ should show disabled placeholder when disabled
+  - Przekaż disabled=true
+  - Sprawdź placeholder "Osiągnięto limit 3 filmów"
+  
+✅ should call onChange when typing
+  - Wpisz tekst
+  - Sprawdź że onChange został wywołany
+  
+✅ should debounce search (250ms)
+  - Mock useDebouncedValue
+  - Wpisz szybko 3 razy
+  - Sprawdź że tylko ostatnia wartość jest użyta
+  
+✅ should show search results dropdown when query >= 2 chars
+  - Mock useMovieSearch → zwróć wyniki
+  - Sprawdź że dropdown otwiera się
+  
+✅ should not show dropdown when query < 2 chars
+  - Query = "a" (1 znak)
+  - Sprawdź że dropdown jest zamknięty
+  
+✅ should show loading spinner when isLoading
+  - Mock useMovieSearch isLoading=true
+  - Sprawdź <Loader2>
+  
+✅ should show error message when error occurs
+  - Mock useMovieSearch error
+  - Sprawdź "Nie udało się pobrać wyników"
+  
+✅ should show empty state when no results
+  - Mock useMovieSearch → []
+  - Sprawdź "Nie znaleziono filmów"
+  
+✅ should call onPick when result is clicked
+  - Kliknij wynik
+  - Sprawdź że onPick został wywołany z SearchOptionVM
+  
+✅ should clear input after picking
+  - Wybierz film
+  - Sprawdź że value = ""
+  
+✅ should disable already selected movies
+  - Przekaż selectedTconsts Set
+  - Sprawdź opacity-50 i brak przycisku "Oznacz"
+  
+✅ should navigate with keyboard (Arrow keys)
+  - ArrowDown → activeIndex++
+  - ArrowUp → activeIndex--
+  
+✅ should select with Enter key
+  - Zaznacz strzałkami
+  - Enter → onPick
+  
+✅ should close with Escape key
+  - Escape → dropdown zamknięty
+  
+✅ should have correct ARIA attributes
+  - role="combobox"
+  - aria-expanded
+  - aria-activedescendant
+```
+
+**Priority:** 🔴 HIGH - Kluczowy komponent UI
+
+**Estymacja:** 3-4h
+
+---
+
+#### 3. 🟡 MEDIUM - Component: `SelectedMoviesList`
+
+**Plik:** `src/components/onboarding/__tests__/SelectedMoviesList.test.tsx`
+
+**Testy do zaimplementowania:**
+```typescript
+✅ should render empty state when no items
+  - items = []
+  - Sprawdź "Brak oznaczonych filmów"
+  
+✅ should render movie items
+  - Przekaż 2 filmy
+  - Sprawdź 2x <SelectedMovieItem>
+  
+✅ should show counter badge
+  - 2 filmy, maxItems=3
+  - Sprawdź Badge "2/3"
+  
+✅ should call onUndo when undo button clicked
+  - Kliknij X na filmie
+  - Sprawdź że onUndo został wywołany
+```
+
+**Priority:** 🟡 MEDIUM
+
+**Estymacja:** 1h
+
+---
+
+#### 4. 🟡 MEDIUM - Component: `SelectedMovieItem`
+
+**Plik:** `src/components/onboarding/__tests__/SelectedMovieItem.test.tsx`
+
+**Testy do zaimplementowania:**
+```typescript
+✅ should render movie title and year
+  
+✅ should render poster or placeholder
+  
+✅ should show loading status
+  - status='loading'
+  - Sprawdź spinner i "Oznaczanie..."
+  
+✅ should show success status
+  - status='success'
+  - Sprawdź zielony checkmark i "Obejrzany"
+  
+✅ should show error status
+  - status='error'
+  - Sprawdź czerwony alert i komunikat błędu
+  
+✅ should disable undo button when loading
+  - status='loading'
+  - Sprawdź disabled=true
+  
+✅ should call onUndo when X clicked
+  - Kliknij przycisk X
+  - Sprawdź callback
+```
+
+**Priority:** 🟡 MEDIUM
+
+**Estymacja:** 1-1.5h
+
+---
+
+#### 5. 🟡 MEDIUM - API Functions
+
+**Plik:** `src/lib/api/__tests__/movies.test.ts`
+
+**Nowe funkcje do przetestowania:**
+
+```typescript
+// patchUserMovie
+✅ should call PATCH /api/user-movies/:id
+✅ should send UpdateUserMovieCommand in body
+✅ should return UserMovieDto
+✅ should handle 400 already watched
+✅ should handle 401 Unauthorized
+
+// deleteUserMovie
+✅ should call DELETE /api/user-movies/:id
+✅ should return void (204)
+✅ should handle 404 Not Found
+✅ should handle 401 Unauthorized
+
+// listUserMovies
+✅ should call GET /api/user-movies without params
+✅ should call GET /api/user-movies?status=watchlist
+✅ should call GET /api/user-movies?status=watched
+✅ should return UserMovieDto[]
+✅ should handle errors
+```
+
+**Priority:** 🟡 MEDIUM
+
+**Estymacja:** 2h
+
+---
+
+#### 6. 🟢 LOW - Hooks: `usePatchUserMovie`, `useDeleteUserMovie`, `useListUserMovies`
+
+**Pliki:** 
+- `src/hooks/__tests__/usePatchUserMovie.test.ts`
+- `src/hooks/__tests__/useDeleteUserMovie.test.ts`
+- `src/hooks/__tests__/useListUserMovies.test.ts`
+
+**Testy do zaimplementowania (każdy hook):**
+```typescript
+✅ should call API function with correct params
+✅ should invalidate queries on success
+✅ should handle errors
+✅ should return correct mutation/query state
+```
+
+**Priority:** 🟢 LOW - Proste wrappery
+
+**Estymacja:** 1h (wszystkie 3 razem)
+
+---
+
+#### 7. 🟢 LOW - Page: `OnboardingWatchedPage`
+
+**Plik:** `src/pages/onboarding/__tests__/OnboardingWatchedPage.test.tsx`
+
+**Testy do zaimplementowania:**
+```typescript
+✅ should render all sections
+  - ProgressBar
+  - OnboardingHeader
+  - WatchedSearchCombobox
+  - SelectedMoviesList
+  - OnboardingFooterNav
+  
+✅ should redirect if onboardingComplete=true
+  - Mock localStorage.getItem → 'true'
+  - Sprawdź navigate('/')
+  
+✅ should disable search when 3/3
+  - Mock controller → selected.length = 3
+  - Sprawdź disabled=true
+  
+✅ should call controller.pick when movie selected
+  - Mock WatchedSearchCombobox onPick
+  - Sprawdź że controller.pick został wywołany
+  
+✅ should call controller.undo when undo clicked
+  
+✅ should call controller.skip when Skip clicked
+  
+✅ should call controller.finish when Zakończ clicked
+```
+
+**Priority:** 🟢 LOW - Prosta integracja
+
+**Estymacja:** 1-1.5h
+
+---
+
+### 🎯 Priorytet implementacji - Onboarding Watched Tests
+
+| Priority | Komponenty | Czas |
+|----------|-----------|------|
+| 🔴 KRYTYCZNE | `useOnboardingWatchedController` | **4-5h** |
+| 🔴 WYSOKIE | `WatchedSearchCombobox` | **3-4h** |
+| 🟡 ŚREDNIE | `SelectedMoviesList` + `SelectedMovieItem` + API | **4-5h** |
+| 🟢 NISKIE | Hooks + Page | **2-3h** |
+| **TOTAL** | **7 plików testowych** | **13-17h** |
+
+**Rozłożone na dni:**
+- Dzień 1 (5h): `useOnboardingWatchedController` (złożony!)
+- Dzień 2 (4h): `WatchedSearchCombobox`
+- Dzień 3 (3h): `SelectedMoviesList` + `SelectedMovieItem`
+- Dzień 4 (2h): API functions + hooks
+- Dzień 5 (1h): Page integration test
+
+---
+
+### 📝 Specjalne wymagania testowe
+
+#### Mock dla complex flow
+
+```typescript
+// Mock setup dla useOnboardingWatchedController
+import { renderHook, act } from '@testing-library/react-hooks';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+};
+
+// Mock API calls
+vi.mock('@/lib/api/movies', () => ({
+  addUserMovie: vi.fn(),
+  patchUserMovie: vi.fn(),
+  deleteUserMovie: vi.fn(),
+  listUserMovies: vi.fn(),
+}));
+
+// Test przykładowy
+it('should handle 409 conflict', async () => {
+  const mockAddUserMovie = vi.mocked(addUserMovie);
+  const mockListUserMovies = vi.mocked(listUserMovies);
+  const mockPatchUserMovie = vi.mocked(patchUserMovie);
+  
+  // Setup: POST returns 409
+  mockAddUserMovie.mockRejectedValueOnce({ status: 409 });
+  
+  // Setup: Lookup returns existing movie
+  mockListUserMovies.mockResolvedValueOnce([{
+    id: 123,
+    movie: { tconst: 'tt0816692', /* ... */ },
+    /* ... */
+  }]);
+  
+  // Setup: PATCH succeeds
+  mockPatchUserMovie.mockResolvedValueOnce({/* UserMovieDto */});
+  
+  const { result } = renderHook(() => useOnboardingWatchedController(), {
+    wrapper: createWrapper(),
+  });
+  
+  await act(async () => {
+    await result.current.pick({
+      tconst: 'tt0816692',
+      primaryTitle: 'Interstellar',
+      /* ... */
+    });
+  });
+  
+  // Assertions
+  expect(mockListUserMovies).toHaveBeenCalledWith('watchlist');
+  expect(mockPatchUserMovie).toHaveBeenCalledWith(123, {
+    action: 'mark_as_watched',
+  });
+  expect(result.current.viewModel.selected[0].source).toBe('preexisting_watchlist');
+});
+```
+
+---
+
 ## Następne kroki
 
 1. **NAJPIERW:** Zainstaluj dependencies i skonfiguruj Vitest
@@ -1812,5 +2284,5 @@ export function createMockAxios(): AxiosInstance {
 **Data utworzenia:** 29 października 2025  
 **Ostatnia aktualizacja:** 29 października 2025  
 **Status:** Plan gotowy do implementacji  
-**Etapy:** Onboarding Add View + Auth Views (Register & Login)
+**Etapy:** Onboarding Platforms + Onboarding Add + Onboarding Watched + Auth Views (Register & Login)
 

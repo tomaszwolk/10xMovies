@@ -15,6 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ACCESS_TOKEN_KEY = "myVOD_access_token";
 const REFRESH_TOKEN_KEY = "myVOD_refresh_token";
+const ONBOARDING_CHECKED_KEY = "onboarding_initial_check_done";
 
 /**
  * AuthProvider manages JWT tokens and authentication state.
@@ -34,6 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
     setAccessToken(tokens.access);
     setRefreshToken(tokens.refresh);
+    
+    // Clear onboarding check flag on new login to trigger initial redirect
+    sessionStorage.removeItem(ONBOARDING_CHECKED_KEY);
   };
 
   const logout = () => {
@@ -41,6 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     setAccessToken(null);
     setRefreshToken(null);
+    
+    // Clear onboarding check flag on logout
+    sessionStorage.removeItem(ONBOARDING_CHECKED_KEY);
   };
 
   const updateAccessToken = (newAccessToken: string) => {

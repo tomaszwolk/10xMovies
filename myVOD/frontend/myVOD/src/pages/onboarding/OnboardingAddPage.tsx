@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { OnboardingLayout } from "@/components/onboarding/OnboardingLayout";
@@ -8,6 +8,7 @@ import { MovieSearchCombobox } from "@/components/onboarding/MovieSearchCombobox
 import { AddedMoviesGrid } from "@/components/onboarding/AddedMoviesGrid";
 import { OnboardingFooterNav } from "@/components/onboarding/OnboardingFooterNav";
 import { useAddUserMovie } from "@/hooks/useAddUserMovie";
+import { getNextOnboardingPath, useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import type { AddedMovieVM, SearchOptionVM } from "@/types/api.types";
 
 /**
@@ -19,11 +20,37 @@ export function OnboardingAddPage() {
   const navigate = useNavigate();
   const [added, setAdded] = useState<AddedMovieVM[]>([]);
   const [addedSet, setAddedSet] = useState<Set<string>>(new Set());
+  const hasPrefilledFromWatchlistRef = useRef(false);
 
   const addUserMovieMutation = useAddUserMovie();
+  const { progress, watchlistMovies } = useOnboardingStatus();
 
   const MAX_MOVIES = 3;
   const canAddMore = added.length < MAX_MOVIES;
+
+  // Prefill with existing watchlist movies (if available)
+  useEffect(() => {
+    if (hasPrefilledFromWatchlistRef.current) {
+      return;
+    }
+
+    if (!watchlistMovies || watchlistMovies.length === 0) {
+      return;
+    }
+
+    const prefilled = watchlistMovies
+      .slice(0, MAX_MOVIES)
+      .map<AddedMovieVM>((movie) => ({
+        tconst: movie.movie.tconst,
+        primaryTitle: movie.movie.primary_title,
+        startYear: movie.movie.start_year,
+        posterUrl: movie.movie.poster_path,
+      }));
+
+    setAdded(prefilled);
+    setAddedSet(new Set(prefilled.map((movie) => movie.tconst)));
+    hasPrefilledFromWatchlistRef.current = true;
+  }, [watchlistMovies, MAX_MOVIES]);
 
   const handleAddMovie = async (searchOption: SearchOptionVM) => {
     // Prevent adding if already at limit or duplicate in session
@@ -78,13 +105,15 @@ export function OnboardingAddPage() {
   };
 
   const handleSkip = () => {
-    // Navigate to watchlist (since /onboarding/seen doesn't exist yet)
-    navigate("/watchlist");
+    // Skip to the next incomplete onboarding step (or main app if finished)
+    const nextPath = getNextOnboardingPath(progress, { fromStep: "add" });
+    navigate(nextPath, { replace: true });
   };
 
   const handleNext = () => {
-    // Navigate to watchlist (since /onboarding/seen doesn't exist yet)
-    navigate("/watchlist");
+    // Navigate to next onboarding step (watched movies)
+    const nextPath = getNextOnboardingPath(progress, { fromStep: "add" });
+    navigate(nextPath, { replace: true });
   };
 
   return (
