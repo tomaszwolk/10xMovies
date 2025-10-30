@@ -64,7 +64,7 @@ export const router = createBrowserRouter([
         element: <AppRoot />,
       },
       {
-        path: "watchlist",
+        path: "app/watchlist",
         element: <WatchlistPage />,
       },
       {

@@ -91,6 +91,7 @@ export type SuggestionItemDto = {
   tconst: string;
   primary_title: string;
   start_year: number | null;
+  poster_path: string | null;
   justification: string;
   availability: MovieAvailabilityDto[];
 };
