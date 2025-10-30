@@ -11,13 +11,18 @@ import type { MovieSearchResultDto, UserMovieDto, AddUserMovieCommand, UpdateUse
  * @param query - Search query (minimum 2 characters)
  * @returns Promise<MovieSearchResultDto[]>
  */
-export async function searchMovies(query: string): Promise<MovieSearchResultDto[]> {
+type SearchMoviesOptions = {
+  signal?: AbortSignal;
+};
+
+export async function searchMovies(query: string, options: SearchMoviesOptions = {}): Promise<MovieSearchResultDto[]> {
   if (query.length < 2) {
     return [];
   }
 
   const response = await http.get<MovieSearchResultDto[]>("/movies/", {
     params: { search: query },
+    signal: options.signal,
   });
 
   return response.data;

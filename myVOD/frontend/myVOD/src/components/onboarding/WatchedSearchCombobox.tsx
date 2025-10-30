@@ -31,9 +31,11 @@ export function WatchedSearchCombobox({
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debouncedQuery = useDebouncedValue(value, 250);
+  const debouncedQuery = useDebouncedValue(value, 450);
 
-  const { data: results = [], isLoading, error } = useMovieSearch(debouncedQuery);
+  const movieSearch = useMovieSearch(debouncedQuery);
+  const results = movieSearch.data ?? [];
+  const { isLoading, error, metrics } = movieSearch;
 
   // Reset active index when results change
   useEffect(() => {
@@ -204,6 +206,12 @@ export function WatchedSearchCombobox({
           )}
         </PopoverContent>
       </Popover>
+
+      {import.meta.env.DEV && metrics.lastDurationMs != null && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Ostatnie wyszukiwanie "{metrics.lastQuery}" trwało {Math.round(metrics.lastDurationMs)} ms • ukończone: {metrics.completedCount} • anulowane: {metrics.abortedCount}
+        </p>
+      )}
     </div>
   );
 }

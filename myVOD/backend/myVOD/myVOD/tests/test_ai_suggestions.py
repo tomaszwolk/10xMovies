@@ -7,9 +7,11 @@ import uuid
 import os
 from unittest.mock import Mock, patch
 from datetime import datetime, time
+
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 from rest_framework import status
 from movies.models import (
     AiSuggestionBatch,
@@ -22,6 +24,8 @@ from movies.models import (
 from dotenv import load_dotenv
 
 load_dotenv()
+
+User = get_user_model()
 
 
 class AISuggestionsGetAPITests(APITestCase):
@@ -39,23 +43,37 @@ class AISuggestionsGetAPITests(APITestCase):
 
     def setUp(self):
         """Set up test data for each test."""
-        # Create test user with UUID from environment (must exist in Supabase auth.users)
+        # Clean up first to ensure clean state
         self.test_user_id = uuid.UUID(os.getenv("TEST_USER", str(uuid.uuid4())))
-        self.user = Mock()
-        self.user.id = self.test_user_id
-        self.user.email = "test@example.com"
-        self.user.is_authenticated = True
+
+        # Clean up any leftover data from previous tests
+        AiSuggestionBatch.objects.filter(user_id=self.test_user_id).delete()
+        UserMovie.objects.filter(user_id=self.test_user_id).delete()
+        UserPlatform.objects.filter(user_id=self.test_user_id).delete()
+        # Clean movie availability (will be recreated as needed)
+        MovieAvailability.objects.filter(tconst='tt0111161').delete()
+
+        # Get or create test user with UUID (real Django user)
+        self.user, created = User.objects.get_or_create(
+            id=self.test_user_id,
+            defaults={
+                "username": f"test_user_{self.test_user_id.hex[:8]}",
+                "email": "test@example.com",
+            }
+        )
+        if not self.user.has_usable_password():
+            self.user.set_password("testpass")
+            self.user.save()
+
+        # Ensure user is committed to DB
+        self.user.refresh_from_db()
+
+        self.client = APIClient()
 
         # Create test platform
         self.platform, _ = Platform.objects.get_or_create(
             platform_slug="test-netflix-suggestions",
             defaults={'platform_name': "Test Netflix Suggestions"}
-        )
-
-        # Associate platform with user
-        UserPlatform.objects.get_or_create(
-            user_id=self.user.id,
-            platform_id=self.platform.id
         )
 
         # Create test movie
@@ -69,15 +87,34 @@ class AISuggestionsGetAPITests(APITestCase):
             }
         )
 
+        # Associate platform with user (after cleanup)
+        UserPlatform.objects.get_or_create(
+            user_id=self.user.id,
+            platform_id=self.platform.id
+        )
+
         # URL for the endpoint
         self.url = reverse('suggestions')
 
     def tearDown(self):
         """Clean up test data after each test."""
-        AiSuggestionBatch.objects.filter(user_id=self.user.id).delete()
-        UserMovie.objects.filter(user_id=self.user.id).delete()
-        UserPlatform.objects.filter(user_id=self.user.id).delete()
-        MovieAvailability.objects.filter(tconst=self.movie).delete()
+        from django.db import connection, transaction
+
+        # If we're in a broken transaction, roll it back
+        if connection.in_atomic_block and transaction.get_rollback():
+            transaction.set_rollback(False)
+            connection.needs_rollback = False
+
+        try:
+            # Clean up test data but keep the user (for reuse in other tests)
+            AiSuggestionBatch.objects.filter(user_id=self.user.id).delete()
+            UserMovie.objects.filter(user_id=self.user.id).delete()
+            UserPlatform.objects.filter(user_id=self.user.id).delete()
+            MovieAvailability.objects.filter(tconst=self.movie).delete()
+            # Note: We don't delete the user to avoid conflicts with TEST_USER UUID
+        except Exception as e:
+            # If cleanup fails, log but don't fail the test
+            print(f"Warning: tearDown cleanup failed: {e}")
 
     def test_suggestions_requires_authentication(self):
         """Test that endpoint requires authentication (401)."""

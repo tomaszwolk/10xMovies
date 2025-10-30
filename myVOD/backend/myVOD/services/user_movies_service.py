@@ -1,9 +1,11 @@
 import logging
-from django.db.models import Prefetch, Exists, OuterRef
-from django.db import transaction
-from django.utils import timezone
-from movies.models import UserMovie, MovieAvailability, UserPlatform, Movie  # type: ignore
 import uuid
+
+from django.db import transaction
+from django.db.models import Exists, OuterRef, Prefetch
+from django.utils import timezone
+
+from movies.models import Movie, MovieAvailability, UserMovie, UserPlatform  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -14,30 +16,8 @@ def _get_user_platform_ids(user_id):
     )
 
 
-def _get_supabase_user_uuid(email: str):
-    """
-    Get the Supabase UUID for a user by email from auth.users table.
-
-    Returns UUID string or raises Exception if not found.
-    """
-    from django.db import connection
-
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT id FROM auth.users WHERE email = %s LIMIT 1",
-            [email]
-        )
-        row = cursor.fetchone()
-        if row:
-            return str(row[0])
-    raise Exception(f"Supabase user not found for email: {email}")
-
-
 def _resolve_user_uuid(user):
-    """Resolve canonical UUID for the given user.
-
-    Production path: trust Django users_user UUID.
-    """
+    """Resolve canonical UUID for the given user (Django `users_user`)."""
     if not hasattr(user, "id"):
         raise Exception("Unable to resolve user UUID: missing id on user")
 

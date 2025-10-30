@@ -3,17 +3,22 @@ Integration tests for user profile API endpoints.
 
 Tests the full request-response cycle for GET /api/me/ and PATCH /api/me/ endpoints.
 """
-import uuid
-from unittest.mock import Mock, patch
-from django.urls import reverse
-from rest_framework.test import APITestCase
-from rest_framework import status
-from movies.models import Platform, UserPlatform
-from django.db import DatabaseError
 import os
+import uuid
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.db import DatabaseError
+from django.urls import reverse
+from rest_framework.test import APIClient, APITestCase
+from rest_framework import status
+
+from movies.models import Platform, UserPlatform
 from dotenv import load_dotenv
 
 load_dotenv()
+
+User = get_user_model()
 
 
 class UserProfileGetAPITests(APITestCase):
@@ -35,21 +40,43 @@ class UserProfileGetAPITests(APITestCase):
 
         Creates mock users and test platforms.
         """
-        # Create test user with UUID
+        # Clean up first
         self.test_user_id = uuid.UUID(os.getenv("TEST_USER", str(uuid.uuid4())))
-        self.user = Mock()
-        self.user.id = self.test_user_id
-        self.user.email = "test@example.com"
-        self.user.is_authenticated = True
+        self.test_user2_id = uuid.UUID(os.getenv("TEST_USER_2", str(uuid.uuid4())))
+
+        # Clean up any leftover data
+        UserPlatform.objects.filter(user_id=self.test_user_id).delete()
+        UserPlatform.objects.filter(user_id=self.test_user2_id).delete()
+
+        # Get or create test user with UUID
+        self.user, _ = User.objects.get_or_create(
+            id=self.test_user_id,
+            defaults={
+                "username": f"profile_user_{self.test_user_id.hex[:8]}",
+                "email": "test@example.com",
+            }
+        )
+        if not self.user.has_usable_password():
+            self.user.set_password("testpass")
+            self.user.save()
+        self.user.refresh_from_db()
+
+        # Get or create second test user
+        self.user2, _ = User.objects.get_or_create(
+            id=self.test_user2_id,
+            defaults={
+                "username": f"profile_user_2_{self.test_user2_id.hex[:8]}",
+                "email": "test2@example.com",
+            }
+        )
+        if not self.user2.has_usable_password():
+            self.user2.set_password("testpass")
+            self.user2.save()
+        self.user2.refresh_from_db()
+
+        self.client = APIClient()
 
         # Create second test user
-        self.user2_id = uuid.uuid4()
-        self.user2 = Mock()
-        self.user2.id = self.user2_id
-        self.user2.email = "test2@example.com"
-        self.user2.is_authenticated = True
-
-        # Create test platforms
         self.platform1, _ = Platform.objects.get_or_create(
             platform_slug="test-netflix-profile",
             defaults={'platform_name': "Test Netflix"}
@@ -190,9 +217,21 @@ class UserProfileGetAPITests(APITestCase):
 
     def tearDown(self):
         """Clean up test data."""
-        # Clean up user platforms created during tests
-        UserPlatform.objects.filter(user_id=self.user.id).delete()
-        UserPlatform.objects.filter(user_id=self.user2.id).delete()
+        from django.db import connection, transaction
+
+        # If we're in a broken transaction, roll it back
+        if connection.in_atomic_block and transaction.get_rollback():
+            transaction.set_rollback(False)
+            connection.needs_rollback = False
+
+        try:
+            # Clean up user platforms created during tests but keep users
+            UserPlatform.objects.filter(user_id=self.user.id).delete()
+            UserPlatform.objects.filter(user_id=self.user2.id).delete()
+            # Note: We don't delete users to avoid conflicts with TEST_USER UUIDs
+        except Exception as e:
+            # If cleanup fails, log but don't fail the test
+            print(f"Warning: tearDown cleanup failed: {e}")
 
 
 class UserProfilePatchAPITests(APITestCase):
@@ -215,12 +254,24 @@ class UserProfilePatchAPITests(APITestCase):
 
         Creates mock users and test platforms.
         """
-        # Create test user
+        # Clean up first
         self.test_user_id = uuid.UUID(os.getenv("TEST_USER", str(uuid.uuid4())))
-        self.user = Mock()
-        self.user.id = self.test_user_id
-        self.user.email = "test@example.com"
-        self.user.is_authenticated = True
+        UserPlatform.objects.filter(user_id=self.test_user_id).delete()
+
+        # Get or create test user
+        self.user, _ = User.objects.get_or_create(
+            id=self.test_user_id,
+            defaults={
+                "username": f"profile_patch_{self.test_user_id.hex[:8]}",
+                "email": "test@example.com",
+            }
+        )
+        if not self.user.has_usable_password():
+            self.user.set_password("testpass")
+            self.user.save()
+        self.user.refresh_from_db()
+
+        self.client = APIClient()
 
         # Create test platforms
         self.platform1, _ = Platform.objects.get_or_create(
@@ -437,6 +488,17 @@ class UserProfilePatchAPITests(APITestCase):
 
     def tearDown(self):
         """Clean up test data."""
-        # Clean up user platforms created during tests
-        UserPlatform.objects.filter(user_id=self.user.id).delete()
+        from django.db import connection, transaction
 
+        # If we're in a broken transaction, roll it back
+        if connection.in_atomic_block and transaction.get_rollback():
+            transaction.set_rollback(False)
+            connection.needs_rollback = False
+
+        try:
+            # Clean up user platforms created during tests but keep user
+            UserPlatform.objects.filter(user_id=self.user.id).delete()
+            # Note: We don't delete user to avoid conflicts with TEST_USER UUID
+        except Exception as e:
+            # If cleanup fails, log but don't fail the test
+            print(f"Warning: tearDown cleanup failed: {e}")

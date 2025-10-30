@@ -1,8 +1,10 @@
 import uuid
-from unittest.mock import Mock, patch
+from unittest.mock import patch
+
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
+
 from movies.models import Movie, Platform, UserMovie, MovieAvailability, UserPlatform  # type: ignore
 from dotenv import load_dotenv
 import os
@@ -11,17 +13,42 @@ from django.utils import timezone
 load_dotenv()
 
 
+def resolve_test_user_uuid() -> uuid.UUID:
+    env_value = os.getenv("TEST_USER")
+    if env_value:
+        try:
+            return uuid.UUID(env_value)
+        except ValueError:
+            pass
+
+    generated = uuid.uuid4()
+    os.environ["TEST_USER"] = str(generated)
+    return generated
+
+
 class UserMovieAPITests(APITestCase):
     def setUp(self):
-        self.test_user_id = uuid.UUID(os.getenv("TEST_USER"))
-        self.user1 = Mock()
-        self.user1.id = self.test_user_id
-        self.user1.is_authenticated = True
+        self.test_user_id = resolve_test_user_uuid()
+        from django.contrib.auth import get_user_model
 
-        self.user2 = Mock()
-        self.user2.id = uuid.uuid4()
-        self.user2.is_authenticated = True
-        self.user2.userplatform_set.values_list.return_value = []
+        User = get_user_model()
+        self.user1, _ = User.objects.get_or_create(
+            id=self.test_user_id,
+            defaults={
+                'email': 'apitestrunner@example.com',
+                'username': 'apitestrunner',
+                'is_active': True,
+            },
+        )
+
+        self.user2, _ = User.objects.get_or_create(
+            id=uuid.uuid4(),
+            defaults={
+                'email': 'apitestrunner2@example.com',
+                'username': 'apitestrunner2',
+                'is_active': True,
+            },
+        )
 
         self.movie1, _ = Movie.objects.get_or_create(
             tconst="tt0000001", defaults={"primary_title": "Movie 1", "avg_rating": 8.5}
@@ -39,8 +66,6 @@ class UserMovieAPITests(APITestCase):
         self.platform2, _ = Platform.objects.get_or_create(
             id=2, defaults={"platform_slug": "hbo", "platform_name": "HBO"}
         )
-
-        self.user1.userplatform_set.values_list.return_value = [self.platform1.id]
 
         UserPlatform.objects.get_or_create(
             user_id=self.user1.id, platform_id=self.platform1.id
@@ -187,12 +212,12 @@ class UserMoviePostAPITests(APITestCase):
     """Tests for POST /api/user-movies/ endpoint"""
 
     def setUp(self):
-        self.test_user_id = uuid.UUID(os.getenv("TEST_USER"))
+        self.test_user_id = resolve_test_user_uuid()
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
         self.user1, _ = User.objects.get_or_create(
-            id=46,
+            id=self.test_user_id,
             defaults={
                 'email': 'test@example.com',
                 'username': 'testuser',
@@ -200,7 +225,7 @@ class UserMoviePostAPITests(APITestCase):
             }
         )
 
-        self.patcher = patch('services.user_movies_service._get_supabase_user_uuid')
+        self.patcher = patch('services.user_movies_service._resolve_user_uuid')
         self.mock_get_uuid = self.patcher.start()
         self.mock_get_uuid.return_value = str(self.test_user_id)
 
@@ -391,13 +416,13 @@ class UserMoviePatchAPITests(APITestCase):
     """Tests for PATCH /api/user-movies/<id>/ endpoint"""
 
     def setUp(self):
-        self.test_user_id = uuid.UUID(os.getenv("TEST_USER"))
+        self.test_user_id = resolve_test_user_uuid()
 
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
         self.user1, _ = User.objects.get_or_create(
-            id=47,
+            id=self.test_user_id,
             defaults={
                 'email': 'testpatch@example.com',
                 'username': 'testpatchuser',
@@ -405,7 +430,7 @@ class UserMoviePatchAPITests(APITestCase):
             }
         )
 
-        self.patcher = patch('services.user_movies_service._get_supabase_user_uuid')
+        self.patcher = patch('services.user_movies_service._resolve_user_uuid')
         self.mock_get_uuid = self.patcher.start()
         self.mock_get_uuid.return_value = str(self.test_user_id)
 
@@ -799,7 +824,7 @@ class UserMoviePatchAPITests(APITestCase):
             format="json"
         )
         self.assertEqual(response2.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("not marked as watched", str(response2.data["detail"])) 
+        self.assertIn("not marked as watched", str(response2.data["detail"]))
 
     # ============================================================================
     # DELETE Endpoint Tests - Soft Delete Tests
@@ -862,28 +887,18 @@ class UserMoviePatchAPITests(APITestCase):
         """Test IDOR protection: user cannot delete another user's movie."""
         # Create a second user in Django auth
         from django.contrib.auth import get_user_model
+
         User = get_user_model()
-        
-        user2_django, _ = User.objects.get_or_create(
-            id=48,
+        user2_uuid = uuid.uuid4()
+        User.objects.get_or_create(
+            id=user2_uuid,
             defaults={
                 'email': 'testuser2@example.com',
                 'username': 'testuser2',
-                'is_active': True
+                'is_active': True,
             }
         )
-        
-        # Create a user in auth.users table for foreign key constraint
-        from django.db import connection
-        user2_uuid = uuid.uuid4()
-        
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO auth.users (id, email, encrypted_password, created_at, updated_at, email_confirmed_at)
-                VALUES (%s, %s, %s, NOW(), NOW(), NOW())
-                ON CONFLICT (id) DO NOTHING
-            """, [user2_uuid, 'testuser2@example.com', 'dummy_password_hash'])
-        
+
         # Create movie for different user
         user2_movie = UserMovie.objects.create(
             user_id=user2_uuid,
@@ -901,4 +916,4 @@ class UserMoviePatchAPITests(APITestCase):
 
         # Verify NOT deleted
         user2_movie_after = UserMovie.objects.get(id=user2_movie.id)
-        self.assertIsNone(user2_movie_after.watchlist_deleted_at) 
+        self.assertIsNone(user2_movie_after.watchlist_deleted_at)

@@ -22,7 +22,8 @@ class WatchmodeService:
         params = {
             "apiKey": self.API_KEY,
             "append_to_response": "sources",
-            "regions": regions
+            "regions": regions,
+            # "region": region,
         }
 
         try:
@@ -59,7 +60,14 @@ class WatchmodeService:
             logger.error(f"Error listing titles from Watchmode API: {e}")
             return None
 
-    def get_source_changes(self, start_date: str, end_date: str, regions: str = 'PL', page: int = 1, types='movie'):
+    def get_source_changes(
+        self,
+        start_date: str,
+        end_date: str,
+        regions: str = 'PL',
+        page: int = 1,
+        types: str = 'movie',
+    ):
         """
         Gets titles that have had their streaming sources changed within a date range.
         """

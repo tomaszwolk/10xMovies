@@ -5,6 +5,7 @@ This module contains business logic for searching movies in the database.
 """
 import logging
 import unicodedata
+from time import perf_counter
 from django.db import connection
 from django.db.models import QuerySet, F
 from django.contrib.postgres.search import TrigramSimilarity
@@ -51,6 +52,7 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
     logger.info(f"Searching for movies with query: '{search_query}'")
 
     try:
+        query_start = perf_counter()
         # Ensure the database connection is open and usable
         try:
             connection.ensure_connection()
@@ -79,9 +81,17 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
             '-similarity',
             '-avg_rating',
             '-start_year'
-        ).prefetch_related('availability_entries')[:limit]
+        )[:limit]
 
-        logger.info(f"Searching movies matching query '{search_query}' (accent-insensitive)")
+        results = list(queryset)
+        duration_ms = (perf_counter() - query_start) * 1000
+
+        logger.info(
+            "Searching movies matching query '%s' (accent-insensitive) – %d results in %.1f ms",
+            search_query,
+            len(results),
+            duration_ms,
+        )
         return queryset
 
     except Exception:
@@ -91,6 +101,7 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
             "immutable_unaccent unavailable; falling back to case-insensitive search without accent removal",
             exc_info=True,
         )
+        fallback_start = perf_counter()
         title_expr = Lower(F('primary_title'))
         query_str = search_query.lower()
 
@@ -102,7 +113,15 @@ def search_movies(search_query: str, limit: int = 20) -> QuerySet[Movie]:
             '-similarity',
             '-avg_rating',
             '-start_year'
-        ).prefetch_related('availability_entries')[:limit]
+        )[:limit]
 
-        logger.info(f"Searching movies matching query '{search_query}' (fallback)")
+        results = list(queryset)
+        duration_ms = (perf_counter() - fallback_start) * 1000
+
+        logger.info(
+            "Searching movies matching query '%s' (fallback) – %d results in %.1f ms",
+            search_query,
+            len(results),
+            duration_ms,
+        )
         return queryset

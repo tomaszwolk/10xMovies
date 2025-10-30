@@ -7,6 +7,7 @@ import os
 import uuid
 from datetime import datetime, time
 from unittest.mock import Mock, patch, MagicMock
+
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -30,6 +31,19 @@ from services.ai_suggestions_service import (
 User = get_user_model()
 
 
+def resolve_test_user_uuid() -> uuid.UUID:
+    env_value = os.getenv("TEST_USER")
+    if env_value:
+        try:
+            return uuid.UUID(env_value)
+        except ValueError:
+            pass
+
+    generated = uuid.uuid4()
+    os.environ["TEST_USER"] = str(generated)
+    return generated
+
+
 class GetOrGenerateSuggestionsTests(TestCase):
     """
     Test suite for get_or_generate_suggestions service function.
@@ -44,10 +58,25 @@ class GetOrGenerateSuggestionsTests(TestCase):
 
     def setUp(self):
         """Set up test data for each test."""
-        # Use Mock user with real Supabase UUID from environment
-        test_user_id = os.getenv("TEST_USER", "00000000-0000-0000-0000-000000000000")
-        self.user = Mock()
-        self.user.id = uuid.UUID(test_user_id)
+        # Ensure we have a real Django user with a deterministic UUID
+        test_user_uuid = resolve_test_user_uuid()
+
+        # Clean up any leftover data from previous tests
+        AiSuggestionBatch.objects.filter(user_id=test_user_uuid).delete()
+        UserMovie.objects.filter(user_id=test_user_uuid).delete()
+        UserPlatform.objects.filter(user_id=test_user_uuid).delete()
+        MovieAvailability.objects.filter(tconst='tt0111161').delete()
+
+        self.user, created = User.objects.get_or_create(
+            id=test_user_uuid,
+            defaults={
+                "email": "ai-test-user@example.com",
+                "username": "ai_test_user",
+                "is_active": True,
+            },
+        )
+        # Ensure user is in DB
+        self.user.refresh_from_db()
 
         # Create test platform
         self.platform, _ = Platform.objects.get_or_create(
@@ -67,11 +96,22 @@ class GetOrGenerateSuggestionsTests(TestCase):
 
     def tearDown(self):
         """Clean up test data after each test."""
-        # Clean up using UUID directly
-        AiSuggestionBatch.objects.filter(user_id=self.user.id).delete()
-        UserMovie.objects.filter(user_id=self.user.id).delete()
-        UserPlatform.objects.filter(user_id=self.user.id).delete()
-        MovieAvailability.objects.filter(tconst=self.movie).delete()
+        from django.db import connection, transaction
+
+        # If we're in a broken transaction, roll it back
+        if connection.in_atomic_block and transaction.get_rollback():
+            transaction.set_rollback(False)
+            connection.needs_rollback = False
+
+        try:
+            # Clean up using UUID directly
+            AiSuggestionBatch.objects.filter(user_id=self.user.id).delete()
+            UserMovie.objects.filter(user_id=self.user.id).delete()
+            UserPlatform.objects.filter(user_id=self.user.id).delete()
+            MovieAvailability.objects.filter(tconst=self.movie).delete()
+        except Exception as e:
+            # If cleanup fails, log but don't fail the test
+            print(f"Warning: tearDown cleanup failed: {e}")
 
     def test_insufficient_data_no_movies(self):
         """Test that InsufficientDataError is raised when user has no movies."""
@@ -307,10 +347,14 @@ class FormatCachedSuggestionsTests(TestCase):
 
     def setUp(self):
         """Set up test data for each test."""
-        # Use Mock user with real Supabase UUID from environment
-        test_user_id = os.getenv("TEST_USER", "00000000-0000-0000-0000-000000000000")
-        self.user = Mock()
-        self.user.id = uuid.UUID(test_user_id)
+        # Create a dedicated test user for this suite
+        user_uuid = uuid.uuid4()
+        self.user = User.objects.create(
+            id=user_uuid,
+            email=f"format-user-{user_uuid}@example.com",
+            username=f"format_user_{user_uuid.hex[:8]}",
+            is_active=True,
+        )
 
         # Create test platform
         self.platform, _ = Platform.objects.get_or_create(
@@ -333,6 +377,7 @@ class FormatCachedSuggestionsTests(TestCase):
         AiSuggestionBatch.objects.filter(user_id=self.user.id).delete()
         UserPlatform.objects.filter(user_id=self.user.id).delete()
         MovieAvailability.objects.filter(tconst=self.movie).delete()
+        self.user.delete()
 
     def test_format_empty_suggestions(self):
         """Test formatting batch with empty suggestions."""
@@ -586,15 +631,15 @@ class AiSuggestionsServiceTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        # Use a mock user with a stable UUID
-        # (aligned with other tests to avoid FK to auth.users)
-        test_user_id = os.getenv(
-            "TEST_USER",
-            "00000000-0000-0000-0000-000000000000"
+        cls.user_uuid = uuid.uuid4()
+        cls.user, _ = User.objects.get_or_create(
+            id=cls.user_uuid,
+            defaults={
+                "email": f"ai-service-{cls.user_uuid}@example.com",
+                "username": f"ai_service_{cls.user_uuid.hex[:8]}",
+                "is_active": True,
+            },
         )
-        cls.user = Mock()
-        cls.user.id = uuid.UUID(test_user_id)
-        cls.user.email = 'test@example.com'
 
         # Platforms
         cls.p_netflix, _ = Platform.objects.get_or_create(

@@ -46,7 +46,7 @@ class MovieSearchResultSerializer(serializers.ModelSerializer):
     Serializer for movie search results.
 
     This maps to MovieSearchResultDto on the frontend.
-    Returns a subset of Movie fields optimized for search results.
+    Returns a lightweight subset of Movie fields optimized for search suggestions.
 
     Fields:
         - tconst: IMDb identifier
@@ -54,14 +54,12 @@ class MovieSearchResultSerializer(serializers.ModelSerializer):
         - start_year: Release year
         - avg_rating: Average rating (converted to string for API consistency)
         - poster_path: URL to movie poster
-        - availability: List of VOD platforms where the movie is available
     """
     avg_rating = serializers.SerializerMethodField()
-    availability = MovieAvailabilitySerializer(many=True, read_only=True, source='availability_entries')
 
     class Meta:
         model = Movie
-        fields = ['tconst', 'primary_title', 'start_year', 'avg_rating', 'poster_path', 'availability']
+        fields = ['tconst', 'primary_title', 'start_year', 'avg_rating', 'poster_path']
 
     def get_avg_rating(self, obj):
         """
