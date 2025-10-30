@@ -59,7 +59,7 @@ class MovieSearchResultSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Movie
-        fields = ['tconst', 'primary_title', 'start_year', 'avg_rating', 'poster_path']
+        fields = ['tconst', 'primary_title', 'start_year', 'avg_rating', 'poster_path', 'num_votes']
 
     def get_avg_rating(self, obj):
         """

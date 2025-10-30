@@ -11,6 +11,7 @@ dependencies = [
     "django-celery-beat>=2.8.1",
     "django-cors-headers>=4.9.0",
     "django-extensions>=4.1",
+    "django-redis>=6.0.0",
     "django-stubs>=5.2.6",
     "djangorestframework>=3.16.1",
     "djangorestframework-simplejwt>=5.5.1",

@@ -15,6 +15,30 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
+# Cache configuration
+
+DEFAULT_CACHE_URL = os.getenv("CACHE_URL")
+
+if DEFAULT_CACHE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": DEFAULT_CACHE_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "movie-search-cache",
+        }
+    }
+
+MOVIE_SEARCH_CACHE_TIMEOUT = int(os.getenv("MOVIE_SEARCH_CACHE_TIMEOUT", "60"))
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

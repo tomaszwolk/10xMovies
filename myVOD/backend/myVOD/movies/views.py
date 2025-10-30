@@ -13,7 +13,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
 from drf_spectacular.types import OpenApiTypes
 from .serializers import (
     MovieSearchQueryParamsSerializer,
-    MovieSearchResultSerializer
+    MovieSearchResultSerializer,
 )
 from services.movie_search_service import search_movies  # type: ignore
 
@@ -109,17 +109,14 @@ class MovieSearchView(APIView):
         search_query = params_serializer.validated_data['search']
 
         try:
-            # Use service layer for business logic
+            # Use service layer for business logic (already serialized data)
             movies = search_movies(search_query)
 
-            # Serialize results
-            serializer = MovieSearchResultSerializer(movies, many=True)
-
             logger.info(
-                f"Successfully returned {len(serializer.data)} movies for search '{search_query}'"
+                f"Successfully returned {len(movies)} movies for search '{search_query}'"
             )
 
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(movies, status=status.HTTP_200_OK)
 
         except DatabaseError as e:
             logger.error(

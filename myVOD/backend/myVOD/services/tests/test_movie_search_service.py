@@ -1,11 +1,15 @@
-"""
-Unit tests for movie_search_service.
+"""Unit tests for movie_search_service."""
 
-Tests the business logic for movie search functionality.
-"""
+from django.core.cache import cache
 from django.test import TestCase
+
 from movies.models import Movie  # type: ignore
-from services.movie_search_service import search_movies  # type: ignore
+from movies.serializers import MovieSearchResultSerializer
+from services.movie_search_service import (  # type: ignore
+    _calculate_similarity_threshold,
+    _normalize_search_query,
+    search_movies,
+)
 
 
 class MovieSearchServiceTests(TestCase):
@@ -32,47 +36,55 @@ class MovieSearchServiceTests(TestCase):
             tconst="tt9990001",
             primary_title="TestMovie Stellar Journey",
             start_year=2014,
-            avg_rating=8.6
+            avg_rating=8.6,
+            num_votes=250000,
         )
         cls.movie2 = Movie.objects.create(
             tconst="tt9990002",
             primary_title="TestMovie Stellar Friendship",
             start_year=2011,
-            avg_rating=8.5
+            avg_rating=8.5,
+            num_votes=180000,
         )
         cls.movie3 = Movie.objects.create(
             tconst="tt9990003",
             primary_title="TestMovie Dream Within",
             start_year=2010,
-            avg_rating=8.8
+            avg_rating=8.8,
+            num_votes=220000,
         )
         cls.movie4 = Movie.objects.create(
             tconst="tt9990004",
             primary_title="TestMovie Digital World",
             start_year=1999,
-            avg_rating=8.7
+            avg_rating=8.7,
+            num_votes=150000,
         )
         cls.movie5 = Movie.objects.create(
             tconst="tt9990005",
             primary_title="TestMovie Digital World Reloaded",
             start_year=2003,
-            avg_rating=7.2
+            avg_rating=7.2,
+            num_votes=120000,
         )
+
+    def setUp(self):
+        cache.clear()
 
     def test_search_with_exact_match(self):
         """Test searching for a movie with exact title match."""
         results = search_movies("TestMovie Stellar Journey")
 
         self.assertGreater(len(results), 0)
-        self.assertEqual(results[0].tconst, "tt9990001")
-        self.assertEqual(results[0].primary_title, "TestMovie Stellar Journey")
+        self.assertEqual(results[0]["tconst"], "tt9990001")
+        self.assertEqual(results[0]["primary_title"], "TestMovie Stellar Journey")
 
     def test_search_with_partial_match(self):
         """Test searching for movies with partial title match."""
         results = search_movies("TestMovie Digital World")
 
         # Should find both Digital World movies
-        result_titles = [movie.primary_title for movie in results]
+        result_titles = [movie["primary_title"] for movie in results]
         self.assertIn("TestMovie Digital World", result_titles)
         self.assertIn("TestMovie Digital World Reloaded", result_titles)
 
@@ -87,9 +99,9 @@ class MovieSearchServiceTests(TestCase):
         self.assertGreater(len(results_upper), 0)
         self.assertGreater(len(results_mixed), 0)
 
-        self.assertEqual(results_lower[0].tconst, "tt9990001")
-        self.assertEqual(results_upper[0].tconst, "tt9990001")
-        self.assertEqual(results_mixed[0].tconst, "tt9990001")
+        self.assertEqual(results_lower[0]["tconst"], "tt9990001")
+        self.assertEqual(results_upper[0]["tconst"], "tt9990001")
+        self.assertEqual(results_mixed[0]["tconst"], "tt9990001")
 
     def test_search_with_fuzzy_match(self):
         """Test fuzzy matching with slight misspellings."""
@@ -98,7 +110,7 @@ class MovieSearchServiceTests(TestCase):
 
         # Should still find "TestMovie Dream Within"
         self.assertGreater(len(results), 0)
-        result_titles = [movie.primary_title for movie in results]
+        result_titles = [movie["primary_title"] for movie in results]
         self.assertIn("TestMovie Dream Within", result_titles)
 
     def test_search_no_results(self):
@@ -128,7 +140,7 @@ class MovieSearchServiceTests(TestCase):
         results = search_movies("  TestMovie Stellar Journey  ")
 
         self.assertGreater(len(results), 0)
-        self.assertEqual(results[0].primary_title, "TestMovie Stellar Journey")
+        self.assertEqual(results[0]["primary_title"], "TestMovie Stellar Journey")
 
     def test_search_ordering_by_similarity(self):
         """Test that results are ordered by similarity score."""
@@ -138,11 +150,44 @@ class MovieSearchServiceTests(TestCase):
         self.assertGreater(len(results), 0)
 
         # The most similar results should come first
-        top_titles = [movie.primary_title for movie in results[:3]]
+        top_titles = [movie["primary_title"] for movie in results[:3]]
         # At least one should start with "TestMovie Stellar"
         self.assertTrue(
             any(title.startswith("TestMovie Stellar") for title in top_titles)
         )
+
+    def test_search_prefers_higher_num_votes_on_tie(self):
+        """When similarity ties, the movie with higher num_votes should rank higher."""
+
+        high_votes_movie = Movie.objects.create(
+            tconst="tt9995001",
+            primary_title="Popularity Tie Movie",
+            start_year=2012,
+            avg_rating=7.5,
+            num_votes=300000,
+        )
+        low_votes_movie = Movie.objects.create(
+            tconst="tt9995002",
+            primary_title="Popularity Tie Movie",
+            start_year=2011,
+            avg_rating=7.6,
+            num_votes=10000,
+        )
+        null_votes_movie = Movie.objects.create(
+            tconst="tt9995003",
+            primary_title="Popularity Tie Movie",
+            start_year=2010,
+            avg_rating=7.7,
+            num_votes=None,
+        )
+
+        results = search_movies("Popularity Tie Movie")
+
+        self.assertGreaterEqual(len(results), 3)
+        returned_tconsts = [result["tconst"] for result in results[:3]]
+        self.assertEqual(returned_tconsts[0], high_votes_movie.tconst)
+        self.assertEqual(returned_tconsts[1], low_votes_movie.tconst)
+        self.assertEqual(returned_tconsts[2], null_votes_movie.tconst)
 
     def test_search_limit_results(self):
         """Test that search respects the limit parameter."""
@@ -152,7 +197,8 @@ class MovieSearchServiceTests(TestCase):
                 tconst=f"tt9991{i:03d}",  # Use unique prefix to avoid collision
                 primary_title=f"Test Movie {i}",
                 start_year=2000 + i,
-                avg_rating=7.0
+                avg_rating=7.0,
+                num_votes=50000,
             )
 
         results = search_movies("Test", limit=10)
@@ -160,13 +206,51 @@ class MovieSearchServiceTests(TestCase):
         # Should return at most 10 results
         self.assertLessEqual(len(results), 10)
 
-    def test_search_returns_queryset(self):
-        """Test that search returns a QuerySet."""
-        from django.db.models import QuerySet
+    def test_search_returns_list(self):
+        """Search service should return serialized list payload."""
 
         results = search_movies("TestMovie Stellar Journey")
 
-        self.assertIsInstance(results, QuerySet)
+        self.assertIsInstance(results, list)
+
+    def test_search_results_include_num_votes(self):
+        """Search results should expose num_votes for popularity ranking."""
+
+        results = search_movies("TestMovie Digital World")
+        self.assertGreater(len(results), 0)
+        self.assertIn("num_votes", results[0])
+
+    def test_search_uses_cache_on_subsequent_calls(self):
+        """Second identical search should hit cache and avoid DB queries."""
+
+        with self.assertNumQueries(1):
+            search_movies("TestMovie Stellar Journey")
+
+        with self.assertNumQueries(0):
+            search_movies("TestMovie Stellar Journey")
+
+    def test_similarity_threshold_selection(self):
+        """Similarity threshold should scale with normalized query length."""
+
+        normalized_short = _normalize_search_query("Ma")
+        threshold_short, length_short = _calculate_similarity_threshold(normalized_short)
+        self.assertEqual(threshold_short, 0.1)
+        self.assertEqual(length_short, 2)
+
+        normalized_medium = _normalize_search_query("Matr")
+        threshold_medium, length_medium = _calculate_similarity_threshold(normalized_medium)
+        self.assertEqual(threshold_medium, 0.2)
+        self.assertEqual(length_medium, 4)
+
+        normalized_long = _normalize_search_query("Matrix")
+        threshold_long, length_long = _calculate_similarity_threshold(normalized_long)
+        self.assertEqual(threshold_long, 0.4)
+        self.assertEqual(length_long, 6)
+
+        normalized_with_spaces = _normalize_search_query(" ma tr ix ")
+        threshold_with_spaces, length_with_spaces = _calculate_similarity_threshold(normalized_with_spaces)
+        self.assertEqual(threshold_with_spaces, 0.4)
+        self.assertEqual(length_with_spaces, 6)
 
     def test_search_with_special_characters(self):
         """Test search with special characters in query."""
@@ -175,14 +259,15 @@ class MovieSearchServiceTests(TestCase):
             tconst="tt9993001",
             primary_title="TestMovie: The Epic Quest & Adventure!",
             start_year=2001,
-            avg_rating=8.8
+            avg_rating=8.8,
+            num_votes=90000,
         )
 
         results = search_movies("TestMovie Epic Quest")
 
         # Should find the movie despite special characters
         self.assertGreater(len(results), 0)
-        result_titles = [movie.primary_title for movie in results]
+        result_titles = [movie["primary_title"] for movie in results]
         self.assertTrue(
             any("TestMovie: The Epic Quest" in title for title in result_titles)
         )
@@ -194,10 +279,20 @@ class MovieSearchServiceTests(TestCase):
             primary_title="TestMovie Café París",
             start_year=2001,
             avg_rating=8.3,
+            num_votes=80000,
         )
 
         results = search_movies("TestMovie Cafe Paris")
 
         self.assertGreaterEqual(len(results), 1)
-        titles = [movie.primary_title for movie in results]
+        titles = [movie["primary_title"] for movie in results]
         self.assertIn("TestMovie Café París", titles)
+
+    def test_movie_search_result_serializer_includes_num_votes(self):
+        """Serializer should expose num_votes field for API consumers."""
+
+        movie = Movie.objects.get(tconst="tt9990001")
+        serialized = MovieSearchResultSerializer(movie)
+        serialized_data = dict(serialized.data)
+        self.assertIn("num_votes", serialized_data)
+        self.assertEqual(serialized_data["num_votes"], movie.num_votes)
