@@ -26,7 +26,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
  * This ensures OnboardingGuard is mounted only once for all protected routes.
  */
 function ProtectedLayout() {
-  console.log("[ProtectedLayout] 🏗️ Rendering");
   return (
     <ProtectedRoute>
       <OnboardingGuard>
@@ -64,7 +63,7 @@ export const router = createBrowserRouter([
         element: <AppRoot />,
       },
       {
-        path: "watchlist",
+        path: "app/watchlist",
         element: <WatchlistPage />,
       },
       {

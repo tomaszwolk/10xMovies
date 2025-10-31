@@ -1,5 +1,5 @@
 import { http } from "@/lib/http";
-import type { MovieSearchResultDto, UserMovieDto, AddUserMovieCommand, UpdateUserMovieCommand } from "@/types/api.types";
+import type { MovieSearchResultDto, UserMovieDto, AddUserMovieCommand, UpdateUserMovieCommand, AISuggestionsDto } from "@/types/api.types";
 
 /**
  * API client for movie-related endpoints.
@@ -71,5 +71,15 @@ export async function listUserMovies(status?: 'watchlist' | 'watched'): Promise<
   const response = await http.get<UserMovieDto[]>("/user-movies/", {
     params: status ? { status } : undefined,
   });
+  return response.data;
+}
+
+/**
+ * Get AI-powered movie suggestions for the user.
+ * Corresponds to GET /api/suggestions/
+ * @returns Promise<AISuggestionsDto>
+ */
+export async function getAISuggestions(): Promise<AISuggestionsDto> {
+  const response = await http.get<AISuggestionsDto>("/suggestions/");
   return response.data;
 }

@@ -22,11 +22,13 @@ describe('useMovieSearch', () => {
       },
     });
 
-    return ({ children }: { children: React.ReactNode }) => (
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={queryClient}>
         {children}
       </QueryClientProvider>
     );
+
+    return Wrapper;
   };
 
   it('should map MovieSearchResultDto to SearchOptionVM correctly', async () => {
@@ -82,6 +84,8 @@ describe('useMovieSearch', () => {
   });
 
   it('should not fetch when query length is less than 2', () => {
+    mockSearchMovies.mockClear();
+
     const { result } = renderHook(() => useMovieSearch('a'), {
       wrapper: createWrapper(),
     });

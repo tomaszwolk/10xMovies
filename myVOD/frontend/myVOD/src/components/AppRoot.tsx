@@ -25,7 +25,7 @@ export function AppRoot() {
     }
 
     if (hasCompletedInitialCheck) {
-      navigate('/watchlist', { replace: true });
+      navigate('/app/watchlist', { replace: true });
       return;
     }
 
@@ -40,7 +40,7 @@ export function AppRoot() {
       return;
     }
 
-    navigate('/watchlist', { replace: true });
+    navigate('/app/watchlist', { replace: true });
   }, [isAuthenticated, hasCompletedInitialCheck, isLoading, requiredStep, navigate]);
 
   // While redirecting, show a loading state

@@ -19,7 +19,7 @@ export function OnboardingFirstMoviesPage() {
 
   const handleNext = () => {
     // Navigate to final step or main app
-    navigate('/watchlist');
+    navigate('/app/watchlist');
   };
 
   return (

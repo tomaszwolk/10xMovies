@@ -25,29 +25,29 @@ export function LoginPage() {
   }, [isAuthenticated, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
       <div className="w-full max-w-md mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2">
             Logowanie
           </h1>
-          <p className="text-slate-400 text-sm sm:text-base">
+          <p className="text-muted-foreground text-sm sm:text-base">
             Zaloguj się do swojego konta MyVOD
           </p>
         </div>
 
         {/* Success Message from Registration */}
         {successMessage && (
-          <div className="mb-6 p-4 bg-green-900/20 border border-green-800 rounded-lg">
-            <p className="text-green-200 text-sm text-center">
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-green-950/20 dark:border-green-800">
+            <p className="text-green-800 text-sm text-center dark:text-green-200">
               {successMessage}
             </p>
           </div>
         )}
 
         {/* Login Form */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg border border-slate-700 shadow-xl p-6 sm:p-8">
+        <div className="bg-card rounded-lg border shadow-xl p-6 sm:p-8">
           <LoginForm />
         </div>
       </div>

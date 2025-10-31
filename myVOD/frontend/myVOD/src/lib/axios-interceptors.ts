@@ -43,9 +43,6 @@ export function setupAxiosInterceptors(
 
       if (token && !isAuthEndpoint) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Axios interceptor: Adding token to request:', config.url);
-      } else {
-        console.log('Axios interceptor: Not adding token to request:', config.url, 'isAuthEndpoint:', isAuthEndpoint);
       }
       
       return config;

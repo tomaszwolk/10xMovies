@@ -84,7 +84,7 @@ export function LoginForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-slate-200">Email</FormLabel>
+              <FormLabel className="text-foreground">Email</FormLabel>
               <FormControl>
                 <Input
                   type="email"
@@ -94,7 +94,7 @@ export function LoginForm() {
                   aria-describedby={
                     form.formState.errors.email ? "email-error" : undefined
                   }
-                  className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-slate-400"
+                  className="bg-background border-input text-foreground placeholder:text-muted-foreground focus:border-ring"
                   {...field}
                 />
               </FormControl>
@@ -109,7 +109,7 @@ export function LoginForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-slate-200">Hasło</FormLabel>
+              <FormLabel className="text-foreground">Hasło</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Input
@@ -122,13 +122,13 @@ export function LoginForm() {
                         ? "password-error"
                         : undefined
                     }
-                    className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-slate-400 pr-10"
+                    className="bg-background border-input text-foreground placeholder:text-muted-foreground focus:border-ring pr-10"
                     {...field}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
                   >
                     {showPassword ? (
@@ -161,7 +161,7 @@ export function LoginForm() {
         </Button>
 
         {/* Register Link */}
-        <p className="text-center text-sm text-slate-400">
+        <p className="text-center text-sm text-muted-foreground">
           Nie masz konta?{" "}
           <Link
             to="/auth/register"
