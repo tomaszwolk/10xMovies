@@ -21,6 +21,7 @@ describe('useWatchedPreferences', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
+    window.sessionStorage.clear();
   });
 
   it('should initialize with default values when no stored preferences', () => {
@@ -28,11 +29,13 @@ describe('useWatchedPreferences', () => {
 
     expect(result.current.viewMode).toBe('grid');
     expect(result.current.sort).toBe('added_desc');
+    expect(result.current.hideUnavailable).toBe(false);
   });
 
-  it('should load stored preferences from localStorage', () => {
+  it('should load stored preferences from storage', () => {
+    window.sessionStorage.setItem('mediaLibrary:viewMode', 'list');
+    window.sessionStorage.setItem('watched:hideUnavailable', 'true');
     localStorageMock.getItem.mockImplementation((key: string) => {
-      if (key === 'watched:viewMode') return 'list';
       if (key === 'watched:sort') return 'year_desc';
       return null;
     });
@@ -41,6 +44,7 @@ describe('useWatchedPreferences', () => {
 
     expect(result.current.viewMode).toBe('list');
     expect(result.current.sort).toBe('year_desc');
+    expect(result.current.hideUnavailable).toBe(true);
   });
 
   it('should normalize legacy sort keys stored in localStorage', () => {
@@ -69,6 +73,12 @@ describe('useWatchedPreferences', () => {
     });
 
     expect(localStorageMock.setItem).toHaveBeenCalledWith('watched:sort', 'imdb_desc');
+
+    act(() => {
+      result.current.setHideUnavailable(true);
+    });
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('watched:hideUnavailable', 'true');
   });
 
   it('should update viewMode correctly', () => {
@@ -95,17 +105,31 @@ describe('useWatchedPreferences', () => {
     expect(result.current.sort).toBe('year_desc');
   });
 
+  it('should update hideUnavailable correctly', () => {
+    const { result } = renderHook(() => useWatchedPreferences());
+
+    expect(result.current.hideUnavailable).toBe(false);
+
+    act(() => {
+      result.current.setHideUnavailable(true);
+    });
+
+    expect(result.current.hideUnavailable).toBe(true);
+  });
+
   it('should persist preferences across re-renders', () => {
     const { result, rerender } = renderHook(() => useWatchedPreferences());
 
     act(() => {
       result.current.setViewMode('list');
       result.current.setSort('imdb_desc');
+      result.current.setHideUnavailable(true);
     });
 
     rerender();
 
     expect(result.current.viewMode).toBe('list');
     expect(result.current.sort).toBe('imdb_desc');
+    expect(result.current.hideUnavailable).toBe(true);
   });
 });

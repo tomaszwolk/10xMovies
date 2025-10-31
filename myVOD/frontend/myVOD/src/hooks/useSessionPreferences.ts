@@ -6,6 +6,7 @@ const WATCHLIST_VIEW_MODE_KEY = "watchlist:viewMode";
 const WATCHLIST_SORT_KEY = "watchlist:sort";
 const WATCHLIST_ONLY_AVAILABLE_KEY = "watchlist:onlyAvailable";
 const WATCHLIST_HIDE_UNAVAILABLE_KEY = "watchlist:hideUnavailable";
+const MEDIA_LIBRARY_VIEW_MODE_KEY = "mediaLibrary:viewMode";
 
 // Default values
 const DEFAULT_VIEW_MODE: ViewMode = "grid";
@@ -29,21 +30,112 @@ type SessionPreferences = {
  */
 export function useSessionPreferences() {
   // Initialize state from sessionStorage or defaults
-  const [preferences, setPreferences] = useState<SessionPreferences>(() => ({
-    viewMode: (sessionStorage.getItem(WATCHLIST_VIEW_MODE_KEY) as ViewMode) || DEFAULT_VIEW_MODE,
-    sort: (sessionStorage.getItem(WATCHLIST_SORT_KEY) as SortOption) || DEFAULT_SORT,
-    filters: {
-      onlyAvailable: sessionStorage.getItem(WATCHLIST_ONLY_AVAILABLE_KEY) === "true" || DEFAULT_FILTERS.onlyAvailable,
-      hideUnavailable: sessionStorage.getItem(WATCHLIST_HIDE_UNAVAILABLE_KEY) === "true" || DEFAULT_FILTERS.hideUnavailable,
-    },
-  }));
+  const [preferences, setPreferences] = useState<SessionPreferences>(() => {
+    const readViewMode = (): ViewMode => {
+      const parse = (raw: string | null): ViewMode | null =>
+        raw === "grid" || raw === "list" ? (raw as ViewMode) : null;
+
+      try {
+        const sessionValue = typeof window !== "undefined"
+          ? parse(window.sessionStorage.getItem(MEDIA_LIBRARY_VIEW_MODE_KEY))
+          : null;
+        if (sessionValue) {
+          return sessionValue;
+        }
+
+        const localValue = typeof window !== "undefined" && window.localStorage
+          ? parse(window.localStorage.getItem(MEDIA_LIBRARY_VIEW_MODE_KEY))
+          : null;
+        if (localValue) {
+          return localValue;
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[useSessionPreferences] Unable to read shared view mode", error);
+        }
+      }
+
+      try {
+        const legacy = typeof window !== "undefined"
+          ? parse(window.sessionStorage.getItem(WATCHLIST_VIEW_MODE_KEY))
+          : null;
+        if (legacy) {
+          return legacy;
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[useSessionPreferences] Unable to read legacy watchlist view mode", error);
+        }
+      }
+
+      return DEFAULT_VIEW_MODE;
+    };
+
+    const readSort = (): SortOption => {
+      try {
+        const value = typeof window !== "undefined"
+          ? (window.sessionStorage.getItem(WATCHLIST_SORT_KEY) as SortOption | null)
+          : null;
+        return value ?? DEFAULT_SORT;
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[useSessionPreferences] Unable to read sort option", error);
+        }
+        return DEFAULT_SORT;
+      }
+    };
+
+    const readFilters = (): FiltersState => {
+      try {
+        if (typeof window === "undefined") {
+          return DEFAULT_FILTERS;
+        }
+        return {
+          onlyAvailable:
+            window.sessionStorage.getItem(WATCHLIST_ONLY_AVAILABLE_KEY) === "true" || DEFAULT_FILTERS.onlyAvailable,
+          hideUnavailable:
+            window.sessionStorage.getItem(WATCHLIST_HIDE_UNAVAILABLE_KEY) === "true" || DEFAULT_FILTERS.hideUnavailable,
+        };
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[useSessionPreferences] Unable to read filters", error);
+        }
+        return DEFAULT_FILTERS;
+      }
+    };
+
+    return {
+      viewMode: readViewMode(),
+      sort: readSort(),
+      filters: readFilters(),
+    };
+  });
 
   // Update sessionStorage when preferences change
   useEffect(() => {
-    sessionStorage.setItem(WATCHLIST_VIEW_MODE_KEY, preferences.viewMode);
-    sessionStorage.setItem(WATCHLIST_SORT_KEY, preferences.sort);
-    sessionStorage.setItem(WATCHLIST_ONLY_AVAILABLE_KEY, String(preferences.filters.onlyAvailable));
-    sessionStorage.setItem(WATCHLIST_HIDE_UNAVAILABLE_KEY, String(preferences.filters.hideUnavailable));
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(WATCHLIST_VIEW_MODE_KEY, preferences.viewMode);
+        window.sessionStorage.setItem(WATCHLIST_SORT_KEY, preferences.sort);
+        window.sessionStorage.setItem(WATCHLIST_ONLY_AVAILABLE_KEY, String(preferences.filters.onlyAvailable));
+        window.sessionStorage.setItem(WATCHLIST_HIDE_UNAVAILABLE_KEY, String(preferences.filters.hideUnavailable));
+        window.sessionStorage.setItem(MEDIA_LIBRARY_VIEW_MODE_KEY, preferences.viewMode);
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[useSessionPreferences] Unable to persist session preferences", error);
+      }
+    }
+
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(MEDIA_LIBRARY_VIEW_MODE_KEY, preferences.viewMode);
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[useSessionPreferences] Unable to persist shared view mode in localStorage", error);
+      }
+    }
   }, [preferences]);
 
   // Setter functions

@@ -3,6 +3,7 @@ import { WatchedSortDropdown } from "./WatchedSortDropdown";
 import { SearchCombobox } from "../watchlist/SearchCombobox";
 import { MediaToolbar } from "@/components/library/MediaToolbar";
 import { SuggestAIButton } from "@/components/watchlist/SuggestAIButton";
+import { WatchedFiltersBar } from "./WatchedFiltersBar";
 import type { WatchedViewMode, WatchedSortKey } from "@/types/view/watched.types";
 
 /**
@@ -19,6 +20,11 @@ type WatchedToolbarProps = {
   existingWatchedTconsts: string[];
   onSuggest: () => void;
   isSuggestDisabled: boolean;
+  hideUnavailable: boolean;
+  onToggleHideUnavailable: () => void;
+  visibleCount: number;
+  totalCount: number;
+  hasUserPlatforms: boolean;
 };
 
 /**
@@ -36,6 +42,11 @@ export function WatchedToolbar({
   existingWatchedTconsts,
   onSuggest,
   isSuggestDisabled,
+  hideUnavailable,
+  onToggleHideUnavailable,
+  visibleCount,
+  totalCount,
+  hasUserPlatforms,
 }: WatchedToolbarProps) {
   return (
     <MediaToolbar
@@ -64,6 +75,15 @@ export function WatchedToolbar({
             onChange={onSortKeyChange}
           />
         </>
+      }
+      secondaryControlsSlot={
+        <WatchedFiltersBar
+          hideUnavailable={hideUnavailable}
+          onToggle={onToggleHideUnavailable}
+          visibleCount={visibleCount}
+          totalCount={totalCount}
+          hasUserPlatforms={hasUserPlatforms}
+        />
       }
     />
   );

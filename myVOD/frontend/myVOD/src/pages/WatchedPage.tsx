@@ -41,8 +41,10 @@ export function WatchedPage() {
   const {
     viewMode,
     sort,
+    hideUnavailable,
     setViewMode,
     setSort,
+    setHideUnavailable,
   } = useWatchedPreferences();
 
   // User profile for platform availability
@@ -185,6 +187,24 @@ export function WatchedPage() {
     suggestionsHandler.addFromSuggestion(tconst);
   };
 
+  const handleToggleHideUnavailable = () => {
+    setHideUnavailable(!hideUnavailable);
+  };
+
+  const hasUserPlatforms = (userProfileQuery.data?.platforms?.length ?? 0) > 0;
+
+  const filteredItems = useMemo(() => {
+    const items = watchedQuery.items ?? [];
+    if (!hideUnavailable || !hasUserPlatforms) {
+      return items;
+    }
+    return items.filter(item => item.isAvailableOnAnyPlatform);
+  }, [hideUnavailable, hasUserPlatforms, watchedQuery.items]);
+
+  const totalCount = watchedQuery.items?.length ?? 0;
+  const visibleCount = filteredItems.length;
+  const isFilteredEmpty = visibleCount === 0;
+
   const tabs = [
     {
       id: "watchlist",
@@ -219,15 +239,20 @@ export function WatchedPage() {
             existingWatchedTconsts={existingWatchedTconsts}
             onSuggest={handleSuggest}
             isSuggestDisabled={suggestionsHandler.isSuggestDisabled}
+          hideUnavailable={hideUnavailable}
+          onToggleHideUnavailable={handleToggleHideUnavailable}
+          visibleCount={visibleCount}
+          totalCount={totalCount}
+          hasUserPlatforms={hasUserPlatforms}
           />
         }
       >
         <WatchedContent
-          items={watchedQuery.items}
+        items={filteredItems}
           viewMode={viewMode}
           platforms={platformsQuery.data || []}
           isLoading={isLoading}
-          isEmpty={watchedQuery.isEmpty}
+        isEmpty={isFilteredEmpty}
           onRestore={handleRestore}
           isRestoring={restoreMutation.isPending}
         />
