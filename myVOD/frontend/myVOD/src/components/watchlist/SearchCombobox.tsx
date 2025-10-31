@@ -107,7 +107,7 @@ export function SearchCombobox({ onAdd, existingTconsts }: SearchComboboxProps) 
               value={query}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="pl-10 pr-4 text-black placeholder:text-gray-500"
+              className="pl-10 pr-4 text-foreground placeholder:text-muted-foreground"
               role="combobox"
               aria-expanded={isOpen}
               aria-haspopup="listbox"
@@ -164,7 +164,7 @@ export function SearchCombobox({ onAdd, existingTconsts }: SearchComboboxProps) 
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate text-black">
+                    <div className="font-medium text-sm truncate text-foreground">
                       {result.primaryTitle}
                     </div>
                     <div className="text-xs text-muted-foreground">

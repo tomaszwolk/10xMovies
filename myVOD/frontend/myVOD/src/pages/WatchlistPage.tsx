@@ -18,6 +18,7 @@ import { WatchlistContent } from "@/components/watchlist/WatchlistContent";
 import { ConfirmDialog } from "@/components/watchlist/ConfirmDialog";
 import { SuggestionModal } from "@/components/watchlist/SuggestionModal";
 import { ToastViewport } from "@/components/watchlist/ToastViewport";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 /**
  * Main watchlist page component.
@@ -134,24 +135,27 @@ export function WatchlistPage() {
   const hasUserPlatforms = (userProfileQuery.data?.platforms?.length || 0) > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-4 lg:p-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl lg:text-4xl font-bold text-white mb-2">
+            <h1 className="text-2xl lg:text-4xl font-bold text-foreground mb-2">
               Moja lista filmów
             </h1>
-            <p className="text-slate-400">
+            <p className="text-muted-foreground">
               Zarządzaj swoimi filmami do obejrzenia
             </p>
           </div>
-          <button
-            onClick={logout}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-          >
-            Wyloguj się
-          </button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle key="theme-toggle" />
+            <button
+              onClick={logout}
+              className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg transition-colors"
+            >
+              Wyloguj się
+            </button>
+          </div>
         </div>
 
         {/* Controls Bar */}
@@ -174,7 +178,7 @@ export function WatchlistPage() {
         </div>
 
         {/* Main Content */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className="bg-card rounded-lg shadow-lg overflow-hidden border">
           <WatchlistContent
             items={items}
             viewMode={viewMode}

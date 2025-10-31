@@ -44,7 +44,7 @@ export const AvailabilityIcons = memo<AvailabilityIconsProps>(function Availabil
 
   if (userAvailability.length === 0) {
     return (
-      <Badge variant="outline" className="text-xs text-gray-500">
+      <Badge variant="outline" className="text-xs text-muted-foreground">
         Dostępność nieznana
       </Badge>
     );

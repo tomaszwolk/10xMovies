@@ -1,5 +1,5 @@
-// Enable dark mode immediately before any imports
-document.documentElement.classList.add('dark');
+// Theme will be managed by useTheme hook
+// Dark mode can be toggled via ThemeToggle component
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -11,6 +11,41 @@ import { setupAxiosInterceptors } from '@/lib/axios-interceptors'
 import { Toaster } from '@/components/ui/sonner'
 import './index.css'
 import { router } from './router'
+
+// Initialize theme before rendering
+function initializeTheme() {
+  if (typeof window === 'undefined') return;
+  
+  const getInitialTheme = (): 'light' | 'dark' => {
+    // Sprawdź localStorage
+    const stored = localStorage.getItem('theme') as 'light' | 'dark';
+    if (stored === 'dark' || stored === 'light') {
+      return stored;
+    }
+    
+    // Jeśli nie ma zapisanego motywu, użyj preferencji systemowych
+    // Jeśli preferencje systemowe też nie są ustawione, domyślnie dark
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'dark'; // Domyślnie dark mode
+  };
+  
+  const theme = getInitialTheme();
+  const root = document.documentElement;
+  
+  if (theme === 'dark') {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+  
+  // Zapisz do localStorage jeśli nie było zapisane
+  if (!localStorage.getItem('theme')) {
+    localStorage.setItem('theme', theme);
+  }
+}
+
+// Initialize theme immediately
+initializeTheme();
 
 // Create a client for TanStack Query
 const queryClient = new QueryClient({

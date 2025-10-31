@@ -32,13 +32,13 @@ export const MovieRow = memo<MovieRowProps>(function MovieRow({ item, platforms,
 
   return (
     <article
-      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
+      className="bg-card rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow"
       aria-labelledby={`movie-title-${item.id}`}
       role="article"
     >
       <div className="flex gap-4">
         {/* Poster */}
-        <div className="w-16 h-24 bg-gray-100 rounded flex-shrink-0">
+        <div className="w-16 h-24 bg-muted rounded flex-shrink-0">
           {!imageError && item.movie.poster_path ? (
             <img
               src={item.movie.poster_path}
@@ -49,7 +49,7 @@ export const MovieRow = memo<MovieRowProps>(function MovieRow({ item, platforms,
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <ImageIcon className="w-6 h-6 text-gray-400" />
+              <ImageIcon className="w-6 h-6 text-muted-foreground" />
             </div>
           )}
         </div>
@@ -61,7 +61,7 @@ export const MovieRow = memo<MovieRowProps>(function MovieRow({ item, platforms,
               {/* Title */}
               <h3
                 id={`movie-title-${item.id}`}
-                className="font-medium text-base line-clamp-1 mb-1 text-black"
+                className="font-medium text-base line-clamp-1 mb-1 text-foreground"
               >
                 {item.movie.primary_title}
               </h3>
@@ -80,7 +80,7 @@ export const MovieRow = memo<MovieRowProps>(function MovieRow({ item, platforms,
                 {item.movie.avg_rating && (
                   <>
                     <span>•</span>
-                    <span className="font-medium text-black">{item.movie.avg_rating}/10</span>
+                    <span className="font-medium text-foreground">{item.movie.avg_rating}/10</span>
                   </>
                 )}
               </div>
@@ -114,9 +114,9 @@ export const MovieRow = memo<MovieRowProps>(function MovieRow({ item, platforms,
               </Button>
               <Button
                 size="sm"
-                variant="outline"
+                variant="destructive"
                 onClick={() => onDelete(item.id)}
-                className="flex items-center gap-2 text-red-600 border-red-300 hover:text-red-700 hover:bg-red-50"
+                className="flex items-center gap-2"
                 aria-label={`Usuń "${item.movie.primary_title}" z watchlisty`}
               >
                 <Trash2 className="w-4 h-4" aria-hidden="true" />

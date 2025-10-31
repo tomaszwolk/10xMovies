@@ -32,12 +32,12 @@ export const MovieCard = memo<MovieCardProps>(function MovieCard({ item, platfor
 
   return (
     <article
-      className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+      className="bg-card rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow"
       aria-labelledby={`movie-title-${item.id}`}
       role="article"
     >
       {/* Poster */}
-      <div className="aspect-[2/3] bg-gray-100 relative">
+      <div className="aspect-[2/3] bg-muted relative">
         {!imageError && item.movie.poster_path ? (
           <img
             src={item.movie.poster_path}
@@ -55,7 +55,7 @@ export const MovieCard = memo<MovieCardProps>(function MovieCard({ item, platfor
         {/* Availability badge overlay */}
         {!item.availabilitySummary.isAvailableOnAny && (
           <div className="absolute top-2 right-2">
-            <Badge variant="secondary" className="text-xs bg-black/70 text-white">
+            <Badge variant="secondary" className="text-xs bg-destructive/80 text-destructive-foreground">
               Niedostępny
             </Badge>
           </div>
@@ -67,7 +67,7 @@ export const MovieCard = memo<MovieCardProps>(function MovieCard({ item, platfor
         {/* Title */}
         <h3
           id={`movie-title-${item.id}`}
-          className="font-medium text-sm line-clamp-2 mb-1 text-black"
+          className="font-medium text-sm line-clamp-2 mb-1 text-foreground"
         >
           {item.movie.primary_title}
         </h3>
@@ -87,7 +87,7 @@ export const MovieCard = memo<MovieCardProps>(function MovieCard({ item, platfor
 
         {/* Rating */}
         {item.movie.avg_rating && (
-          <div className="text-sm font-medium text-gray-900 mb-2">
+          <div className="text-sm font-medium text-foreground mb-2">
             {item.movie.avg_rating}/10
           </div>
         )}
@@ -114,9 +114,9 @@ export const MovieCard = memo<MovieCardProps>(function MovieCard({ item, platfor
           </Button>
           <Button
             size="sm"
-            variant="outline"
+            variant="destructive"
             onClick={() => onDelete(item.id)}
-            className="flex items-center gap-2 text-red-600 border-red-300 hover:text-red-700 hover:bg-red-50"
+            className="flex items-center gap-2"
             aria-label={`Usuń "${item.movie.primary_title}" z watchlisty`}
           >
             <Trash2 className="w-4 h-4" aria-hidden="true" />

@@ -47,11 +47,11 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
             <DropdownMenuItem
               key={key}
               onClick={() => onChange(key)}
-              className={value === key ? "bg-gray-50" : ""}
+              className={value === key ? "bg-accent" : ""}
             >
               <div>
                 <div className="font-medium">{option.label}</div>
-                <div className="text-xs text-gray-500">{option.description}</div>
+                <div className="text-xs text-muted-foreground">{option.description}</div>
               </div>
             </DropdownMenuItem>
           )

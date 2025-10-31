@@ -232,7 +232,7 @@ export function RegisterForm() {
         </Button>
 
         {/* Login Link */}
-        <p className="text-center text-sm text-slate-400">
+        <p className="text-center text-sm text-muted-foreground">
           Masz już konto?{" "}
           <Link
             to="/auth/login"

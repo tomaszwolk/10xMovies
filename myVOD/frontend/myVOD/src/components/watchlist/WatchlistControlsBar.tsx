@@ -44,7 +44,7 @@ export function WatchlistControlsBar({
   existingTconsts,
 }: WatchlistControlsBarProps) {
   return (
-    <div className="bg-white border-b border-gray-200 px-4 py-3">
+    <div className="bg-card border-b px-4 py-3">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         {/* Left section: Search and AI suggestions */}
         <div className="flex flex-col sm:flex-row gap-3 lg:flex-1">

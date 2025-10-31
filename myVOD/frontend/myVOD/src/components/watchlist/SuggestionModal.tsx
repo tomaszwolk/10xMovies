@@ -66,7 +66,7 @@ export function SuggestionModal({ open, onOpenChange, data, onAdd }: SuggestionM
           {data.suggestions.map((suggestion) => (
             <div key={suggestion.tconst} className="border rounded-lg p-4">
               <div className="flex gap-4">
-                <div className="w-20 h-28 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+                <div className="w-20 h-28 bg-muted rounded flex items-center justify-center flex-shrink-0">
                   {suggestion.poster_path ? (
                     <img
                       src={suggestion.poster_path}
@@ -74,16 +74,16 @@ export function SuggestionModal({ open, onOpenChange, data, onAdd }: SuggestionM
                       className="w-full h-full object-cover rounded"
                     />
                   ) : (
-                    <div className="text-gray-400 text-xs">Brak plakatu</div>
+                    <div className="text-muted-foreground text-xs">Brak plakatu</div>
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm line-clamp-2">
+                  <h3 className="font-medium text-sm line-clamp-2 text-foreground">
                     {suggestion.primary_title}
                   </h3>
 
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-muted-foreground mt-1">
                     {suggestion.start_year && `${suggestion.start_year} • `}
                     {suggestion.justification}
                   </div>
