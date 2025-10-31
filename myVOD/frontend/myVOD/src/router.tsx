@@ -3,6 +3,7 @@ import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { WatchlistPage } from "@/pages/WatchlistPage";
 import { WatchedPage } from "@/pages/WatchedPage";
+import { AISuggestionsRoute } from "@/components/suggestions/AISuggestionsRoute";
 import { OnboardingPlatformsPage, OnboardingFirstMoviesPage, OnboardingAddPage, OnboardingWatchedPage } from "@/pages/onboarding";
 import { AppRoot } from "@/components/AppRoot";
 import { OnboardingGuard } from "@/components/OnboardingGuard";
@@ -70,6 +71,10 @@ export const router = createBrowserRouter([
       {
         path: "app/watched",
         element: <WatchedPage />,
+      },
+      {
+        path: "app/suggestions",
+        element: <AISuggestionsRoute />,
       },
       {
         path: "onboarding",

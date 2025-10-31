@@ -95,9 +95,11 @@ export async function restoreUserMovie(id: number): Promise<UserMovieDto> {
 /**
  * Get AI-powered movie suggestions for the user.
  * Corresponds to GET /api/suggestions/
+ * @param debug - Whether to bypass rate limiting (dev only)
  * @returns Promise<AISuggestionsDto>
  */
-export async function getAISuggestions(): Promise<AISuggestionsDto> {
-  const response = await http.get<AISuggestionsDto>("/suggestions/");
+export async function getAISuggestions(debug: boolean = false): Promise<AISuggestionsDto> {
+  const params = debug ? { debug: 'true' } : {};
+  const response = await http.get<AISuggestionsDto>("/suggestions/", { params });
   return response.data;
 }

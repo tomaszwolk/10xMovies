@@ -2,7 +2,7 @@ import { SearchCombobox } from "./SearchCombobox";
 import { ViewToggle } from "./ViewToggle";
 import { SortDropdown } from "./SortDropdown";
 import { FiltersBar } from "./FiltersBar";
-import { SuggestAIButton } from "./SuggestAIButton";
+import { SuggestionsTriggerButton } from "./SuggestionsTriggerButton";
 import type { ViewMode, SortOption, FiltersState } from "@/types/view/watchlist.types";
 
 /**
@@ -18,8 +18,8 @@ type WatchlistControlsBarProps = {
   visibleCount: number;
   totalCount: number;
   hasUserPlatforms: boolean;
-  onSuggest: () => void;
-  isSuggestDisabled: boolean;
+  suggestionsDisabled?: boolean;
+  suggestionsNextAvailableAt?: Date | null;
   onAddToWatchlist: (tconst: string) => Promise<void> | void;
   onAddToWatched: (tconst: string) => Promise<void> | void;
   existingTconsts: string[];
@@ -40,8 +40,8 @@ export function WatchlistControlsBar({
   visibleCount,
   totalCount,
   hasUserPlatforms,
-  onSuggest,
-  isSuggestDisabled,
+  suggestionsDisabled,
+  suggestionsNextAvailableAt,
   onAddToWatchlist,
   onAddToWatched,
   existingTconsts,
@@ -60,9 +60,9 @@ export function WatchlistControlsBar({
               existingWatchedTconsts={existingWatchedTconsts}
             />
           </div>
-          <SuggestAIButton
-            onClick={onSuggest}
-            disabled={isSuggestDisabled}
+          <SuggestionsTriggerButton
+            disabled={suggestionsDisabled}
+            nextAvailableAt={suggestionsNextAvailableAt}
           />
         </div>
 

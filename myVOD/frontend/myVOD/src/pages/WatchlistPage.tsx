@@ -20,7 +20,8 @@ import { usePatchUserMovie } from "@/hooks/usePatchUserMovie";
 import { WatchlistControlsBar } from "@/components/watchlist/WatchlistControlsBar";
 import { WatchlistContent } from "@/components/watchlist/WatchlistContent";
 import { ConfirmDialog } from "@/components/watchlist/ConfirmDialog";
-import { SuggestionModal } from "@/components/watchlist/SuggestionModal";
+import { AISuggestionsDialog } from "@/components/suggestions/AISuggestionsDialog";
+import { useWatchlistTconstSet } from "@/hooks/useWatchlistTconstSet";
 import { ToastViewport } from "@/components/watchlist/ToastViewport";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -62,6 +63,9 @@ export function WatchlistPage() {
     sortOption,
     filters,
   });
+
+  // Get watchlist tconst set for suggestions modal
+  const watchlistTconstSet = useWatchlistTconstSet();
 
   // Action handlers with optimistic updates
   const { mutate: markAsWatched } = useMarkAsWatched();
@@ -175,14 +179,6 @@ export function WatchlistPage() {
     });
   };
 
-  const handleSuggest = () => {
-    suggestionsHandler.handleSuggestClick();
-  };
-
-  const handleAddFromSuggestion = (tconst: string) => {
-    suggestionsHandler.addFromSuggestion(tconst);
-  };
-
   // Get existing tconsts for duplicate checking
   const existingTconsts = items.map(item => item.movie.tconst);
   const watchedEntries = watchedQuery.data ?? [];
@@ -252,8 +248,8 @@ export function WatchlistPage() {
             visibleCount={visibleCount}
             totalCount={totalCount}
             hasUserPlatforms={hasUserPlatforms}
-            onSuggest={handleSuggest}
-            isSuggestDisabled={suggestionsHandler.isSuggestDisabled}
+            suggestionsDisabled={suggestionsHandler.isSuggestDisabled}
+            suggestionsNextAvailableAt={null}
             onAddToWatchlist={handleAddToWatchlist}
             onAddToWatched={handleAddToWatched}
             existingTconsts={existingTconsts}
@@ -286,11 +282,10 @@ export function WatchlistPage() {
           onConfirm={confirmDialog.onConfirm}
         />
 
-        <SuggestionModal
+        <AISuggestionsDialog
           open={suggestionsHandler.isModalOpen}
           onOpenChange={suggestionsHandler.closeModal}
-          data={suggestionsHandler.suggestionsData || null}
-          onAdd={handleAddFromSuggestion}
+          watchlistTconstSet={watchlistTconstSet}
         />
 
         {/* Toast notifications */}
