@@ -5,15 +5,17 @@ import { SearchCombobox } from "./SearchCombobox";
  * Props for EmptyState component.
  */
 type EmptyStateProps = {
-  onAdd: (tconst: string) => void;
+  onAddToWatchlist: (tconst: string) => Promise<void> | void;
+  onAddToWatched: (tconst: string) => Promise<void> | void;
   existingTconsts: string[];
+  existingWatchedTconsts: string[];
 };
 
 /**
  * Empty state component for when watchlist is empty.
  * Displays message and active search combobox to encourage adding movies.
  */
-export function EmptyState({ onAdd, existingTconsts }: EmptyStateProps) {
+export function EmptyState({ onAddToWatchlist, onAddToWatched, existingTconsts, existingWatchedTconsts }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4">
       <div className="text-center mb-8">
@@ -30,8 +32,10 @@ export function EmptyState({ onAdd, existingTconsts }: EmptyStateProps) {
 
       <div className="w-full max-w-md">
         <SearchCombobox
-          onAdd={onAdd}
+          onAddToWatchlist={onAddToWatchlist}
+          onAddToWatched={onAddToWatched}
           existingTconsts={existingTconsts}
+          existingWatchedTconsts={existingWatchedTconsts}
         />
       </div>
     </div>

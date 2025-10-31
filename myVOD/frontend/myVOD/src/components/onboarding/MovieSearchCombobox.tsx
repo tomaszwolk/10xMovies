@@ -120,7 +120,7 @@ export function MovieSearchCombobox({
           </div>
         </PopoverTrigger>
         <PopoverContent
-          className="w-full p-0"
+          className="w-full p-0 bg-popover"
           align="start"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >

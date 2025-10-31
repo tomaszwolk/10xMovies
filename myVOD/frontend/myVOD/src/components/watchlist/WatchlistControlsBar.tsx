@@ -20,8 +20,10 @@ type WatchlistControlsBarProps = {
   hasUserPlatforms: boolean;
   onSuggest: () => void;
   isSuggestDisabled: boolean;
-  onAddFromSearch: (tconst: string) => void;
+  onAddToWatchlist: (tconst: string) => Promise<void> | void;
+  onAddToWatched: (tconst: string) => Promise<void> | void;
   existingTconsts: string[];
+  existingWatchedTconsts: string[];
 };
 
 /**
@@ -40,8 +42,10 @@ export function WatchlistControlsBar({
   hasUserPlatforms,
   onSuggest,
   isSuggestDisabled,
-  onAddFromSearch,
+  onAddToWatchlist,
+  onAddToWatched,
   existingTconsts,
+  existingWatchedTconsts,
 }: WatchlistControlsBarProps) {
   return (
     <div className="bg-card border-b px-4 py-3">
@@ -50,8 +54,10 @@ export function WatchlistControlsBar({
         <div className="flex flex-col sm:flex-row gap-3 lg:flex-1">
           <div className="flex-1 max-w-md">
             <SearchCombobox
-              onAdd={onAddFromSearch}
+              onAddToWatchlist={onAddToWatchlist}
+              onAddToWatched={onAddToWatched}
               existingTconsts={existingTconsts}
+              existingWatchedTconsts={existingWatchedTconsts}
             />
           </div>
           <SuggestAIButton

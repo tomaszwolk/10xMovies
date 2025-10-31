@@ -51,6 +51,7 @@
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: monospace;
   --radius: 0.5rem;
+  --search-popover-background: rgba(255, 255, 255, 0.95);
   --shadow-x: 0px;
   --shadow-y: 1px;
   --shadow-blur: 3px;
@@ -75,7 +76,7 @@
   /* Dark mode colors */
   --background: hsl(0 0% 7.0588%);
   --foreground: hsl(214.2857 31.8182% 91.3725%);
-  --card: hsl(0 0% 9.0196%);
+  --card: hsl(0 0% 18%);
   --card-foreground: hsl(214.2857 31.8182% 91.3725%);
   --popover: hsl(0 0% 14.1176%);
   --popover-foreground: hsl(0 0% 66.2745%);
@@ -125,6 +126,7 @@
   --shadow-2xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.43);
   --tracking-normal: 0.025em;
   --spacing: 0.25rem;
+  --search-popover-background: rgba(0, 0, 0, 0.95);
 }
 
 body {

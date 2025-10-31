@@ -15,8 +15,10 @@ type WatchlistContentProps = {
   platforms: PlatformDto[];
   onMarkWatched: (id: number) => void;
   onDelete: (id: number) => void;
-  onAddFromSearch: (tconst: string) => void;
+  onAddToWatchlist: (tconst: string) => Promise<void> | void;
+  onAddToWatched: (tconst: string) => Promise<void> | void;
   existingTconsts: string[];
+  existingWatchedTconsts: string[];
 };
 
 /**
@@ -31,8 +33,10 @@ export function WatchlistContent({
   platforms,
   onMarkWatched,
   onDelete,
-  onAddFromSearch,
+  onAddToWatchlist,
+  onAddToWatched,
   existingTconsts,
+  existingWatchedTconsts,
 }: WatchlistContentProps) {
   // Show skeleton during loading
   if (isLoading) {
@@ -43,8 +47,10 @@ export function WatchlistContent({
   if (items.length === 0) {
     return (
       <EmptyState
-        onAdd={onAddFromSearch}
+        onAddToWatchlist={onAddToWatchlist}
+        onAddToWatched={onAddToWatched}
         existingTconsts={existingTconsts}
+        existingWatchedTconsts={existingWatchedTconsts}
       />
     );
   }

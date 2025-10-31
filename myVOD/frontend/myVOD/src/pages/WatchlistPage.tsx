@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { isAxiosError } from "axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 // Hooks
 import { useSessionPreferences } from "@/hooks/useSessionPreferences";
@@ -11,6 +13,8 @@ import { useWatchlistSelectors } from "@/hooks/useWatchlistSelectors";
 import { useMarkAsWatched, useDeleteFromWatchlist } from "@/hooks/useWatchlistActions";
 import { useAISuggestionsHandler } from "@/hooks/useAISuggestionsHandler";
 import { useAddMovie } from "@/hooks/useAddMovie";
+import { useListUserMovies } from "@/hooks/useListUserMovies";
+import { usePatchUserMovie } from "@/hooks/usePatchUserMovie";
 
 // Components
 import { WatchlistControlsBar } from "@/components/watchlist/WatchlistControlsBar";
@@ -47,6 +51,7 @@ export function WatchlistPage() {
 
   // Data fetching
   const watchlistQuery = useWatchlistQuery();
+  const watchedQuery = useListUserMovies('watched');
   const userProfileQuery = useUserProfile();
   const platformsQuery = usePlatforms();
 
@@ -67,6 +72,7 @@ export function WatchlistPage() {
 
   // Add movie from search
   const addMovieMutation = useAddMovie();
+  const patchUserMovieMutation = usePatchUserMovie();
 
   // UI state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -94,8 +100,60 @@ export function WatchlistPage() {
     updateFilters(newFilters);
   };
 
-  const handleAddFromSearch = (tconst: string) => {
-    addMovieMutation.mutate({ tconst });
+  const handleAddToWatchlist = async (tconst: string) => {
+    const watchedEntryId = watchedEntriesByTconst.get(tconst);
+
+    if (watchedEntryId) {
+      try {
+        const result = await patchUserMovieMutation.mutateAsync({
+          id: watchedEntryId,
+          command: { action: 'restore_to_watchlist' },
+        });
+        toast.success(`"${result.movie.primary_title}" przywrócono do watchlisty`);
+        return;
+      } catch (error) {
+        toast.error("Nie udało się przywrócić filmu do watchlisty");
+        throw error;
+      }
+    }
+
+    try {
+      const result = await addMovieMutation.mutateAsync({ tconst });
+      toast.success(`"${result.primaryTitle}" dodano do watchlisty`);
+    } catch (error) {
+      if (isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 409) {
+          toast.info("Ten film jest już na Twojej watchliście");
+        } else {
+          const detail = (error.response?.data as any)?.detail ?? (error.response?.data as any)?.tconst?.[0];
+          toast.error(detail ?? "Nie udało się dodać filmu do watchlisty");
+        }
+      } else {
+        toast.error("Nie udało się dodać filmu do watchlisty");
+      }
+      throw error;
+    }
+  };
+
+  const handleAddToWatched = async (tconst: string) => {
+    try {
+      const result = await addMovieMutation.mutateAsync({ tconst, mark_as_watched: true });
+      toast.success(`"${result.primaryTitle}" dodano do obejrzanych`);
+    } catch (error) {
+      if (isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 409) {
+          toast.info("Ten film był już oznaczony jako obejrzany");
+        } else {
+          const detail = (error.response?.data as any)?.detail ?? (error.response?.data as any)?.tconst?.[0];
+          toast.error(detail ?? "Nie udało się dodać filmu do obejrzanych");
+        }
+      } else {
+        toast.error("Nie udało się dodać filmu do obejrzanych");
+      }
+      throw error;
+    }
   };
 
   const handleMarkWatched = (id: number) => {
@@ -127,6 +185,18 @@ export function WatchlistPage() {
 
   // Get existing tconsts for duplicate checking
   const existingTconsts = items.map(item => item.movie.tconst);
+  const watchedEntries = watchedQuery.data ?? [];
+  const watchedEntriesByTconst = useMemo(() => {
+    const map = new Map<string, number>();
+    watchedEntries.forEach(entry => {
+      map.set(entry.movie.tconst, entry.id);
+    });
+    return map;
+  }, [watchedEntries]);
+  const existingWatchedTconsts = useMemo(
+    () => Array.from(watchedEntriesByTconst.keys()),
+    [watchedEntriesByTconst]
+  );
 
   // Loading states
   const isLoading = watchlistQuery.isLoading || userProfileQuery.isLoading || platformsQuery.isLoading;
@@ -184,8 +254,10 @@ export function WatchlistPage() {
             hasUserPlatforms={hasUserPlatforms}
             onSuggest={handleSuggest}
             isSuggestDisabled={suggestionsHandler.isSuggestDisabled}
-            onAddFromSearch={handleAddFromSearch}
+            onAddToWatchlist={handleAddToWatchlist}
+            onAddToWatched={handleAddToWatched}
             existingTconsts={existingTconsts}
+            existingWatchedTconsts={existingWatchedTconsts}
           />
         </div>
 
@@ -198,8 +270,10 @@ export function WatchlistPage() {
             platforms={platformsQuery.data || []}
             onMarkWatched={handleMarkWatched}
             onDelete={handleDelete}
-            onAddFromSearch={handleAddFromSearch}
+            onAddToWatchlist={handleAddToWatchlist}
+            onAddToWatched={handleAddToWatched}
             existingTconsts={existingTconsts}
+            existingWatchedTconsts={existingWatchedTconsts}
           />
         </div>
 

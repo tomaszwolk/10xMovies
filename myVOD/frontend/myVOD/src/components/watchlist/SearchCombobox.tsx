@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useMovieSearch } from "@/hooks/useMovieSearch";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -10,18 +11,21 @@ import type { SearchOptionVM } from "@/types/api.types";
  * Props for SearchCombobox component.
  */
 type SearchComboboxProps = {
-  onAdd: (tconst: string) => void;
+  onAddToWatchlist: (tconst: string) => Promise<void> | void;
+  onAddToWatched: (tconst: string) => Promise<void> | void;
   existingTconsts: string[];
+  existingWatchedTconsts: string[];
 };
 
 /**
  * Search combobox for adding movies to watchlist.
  * Provides debounced search with autocomplete functionality.
  */
-export function SearchCombobox({ onAdd, existingTconsts }: SearchComboboxProps) {
+export function SearchCombobox({ onAddToWatchlist, onAddToWatched, existingTconsts, existingWatchedTconsts }: SearchComboboxProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [pendingTconst, setPendingTconst] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebouncedValue(query, 250);
 
@@ -42,17 +46,51 @@ export function SearchCombobox({ onAdd, existingTconsts }: SearchComboboxProps) 
     }
   }, [query]);
 
-  const handleSelect = (result: SearchOptionVM) => {
-    // Check if movie is already in watchlist
-    if (existingTconsts.includes(result.tconst)) {
-      return; // Don't add duplicates
-    }
-
-    onAdd(result.tconst);
+  const closeAndReset = () => {
     setQuery("");
     setIsOpen(false);
     setActiveIndex(-1);
     inputRef.current?.focus();
+  };
+
+  const executeAction = async (action: () => Promise<void> | void) => {
+    try {
+      const maybePromise = action();
+      if (maybePromise instanceof Promise) {
+        await maybePromise;
+      }
+      closeAndReset();
+    } catch (error) {
+      // Error feedback is handled by the caller (toast notifications).
+    } finally {
+      setPendingTconst(null);
+    }
+  };
+
+  const handleAddToWatchlist = async (result: SearchOptionVM) => {
+    if (pendingTconst) {
+      return;
+    }
+
+    if (existingTconsts.includes(result.tconst)) {
+      return;
+    }
+
+    setPendingTconst(result.tconst);
+    await executeAction(() => onAddToWatchlist(result.tconst));
+  };
+
+  const handleAddToWatched = async (result: SearchOptionVM) => {
+    if (pendingTconst) {
+      return;
+    }
+
+    if (existingWatchedTconsts.includes(result.tconst)) {
+      return;
+    }
+
+    setPendingTconst(result.tconst);
+    await executeAction(() => onAddToWatched(result.tconst));
   };
 
   const handleInputChange = (value: string) => {
@@ -79,7 +117,7 @@ export function SearchCombobox({ onAdd, existingTconsts }: SearchComboboxProps) 
         if (activeIndex >= 0 && activeIndex < results.length) {
           const selectedItem = results[activeIndex];
           if (!existingTconsts.includes(selectedItem.tconst)) {
-            handleSelect(selectedItem);
+            void handleAddToWatchlist(selectedItem);
           }
         }
         break;
@@ -121,10 +159,13 @@ export function SearchCombobox({ onAdd, existingTconsts }: SearchComboboxProps) 
           </div>
         </PopoverTrigger>
         <PopoverContent
-          className="w-full p-0"
+          className="w-full p-0 text-foreground border border-border shadow-lg"
           align="start"
           onOpenAutoFocus={(e) => e.preventDefault()}
-          style={{ width: inputRef.current?.offsetWidth }}
+          style={{ 
+            width: inputRef.current?.offsetWidth,
+            backgroundColor: 'var(--search-popover-background)'
+          }}
         >
           {error ? (
             <div className="p-4 text-center text-destructive text-sm">
@@ -139,41 +180,92 @@ export function SearchCombobox({ onAdd, existingTconsts }: SearchComboboxProps) 
           )}
 
           {results.length > 0 && (
-            <div className="max-h-60 overflow-y-auto">
-              {results.slice(0, 10).map((result, index) => (
-                <button
-                  key={result.tconst}
-                  id={`result-${result.tconst}`}
-                  onClick={() => handleSelect(result)}
-                  disabled={existingTconsts.includes(result.tconst)}
-                  className={`w-full flex items-center gap-3 p-3 text-left border-b border-border last:border-b-0 ${
-                    index === activeIndex
-                      ? 'bg-accent text-accent-foreground'
-                      : 'hover:bg-accent hover:text-accent-foreground disabled:opacity-50 disabled:cursor-not-allowed'
-                  }`}
-                >
-                  <div className="w-12 h-18 bg-muted rounded flex items-center justify-center flex-shrink-0">
-                    {result.posterUrl ? (
-                      <img
-                        src={result.posterUrl}
-                        alt={result.primaryTitle}
-                        className="w-full h-full object-cover rounded"
-                      />
-                    ) : (
-                      <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate text-foreground">
-                      {result.primaryTitle}
+            <div 
+              className="max-h-60 overflow-y-auto divide-y divide-border" 
+              style={{ backgroundColor: 'var(--search-popover-background)' }}
+              role="listbox"
+            >
+              {results.slice(0, 10).map((result, index) => {
+                const isActive = index === activeIndex;
+                const isOnWatchlist = existingTconsts.includes(result.tconst);
+                const isPending = pendingTconst === result.tconst;
+                const isWatched = existingWatchedTconsts.includes(result.tconst);
+
+                return (
+                  <div
+                    key={result.tconst}
+                    id={`result-${result.tconst}`}
+                    role="option"
+                    aria-selected={isActive}
+                    className={`flex flex-col gap-3 p-3 transition-colors ${
+                      isActive ? "bg-accent/80" : "hover:bg-accent/40"
+                    }`}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseLeave={() => setActiveIndex(-1)}
+                    onClick={(event) => {
+                      // Ignorujemy kliknięcia w obszar tła – reagują tylko przyciski
+                      event.preventDefault();
+                    }}
+                    aria-busy={isPending}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-18 bg-muted rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {result.posterUrl ? (
+                          <img
+                            src={result.posterUrl}
+                            alt={result.primaryTitle}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate text-foreground">
+                          {result.primaryTitle}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {result.startYear && `${result.startYear} • `}
+                          {result.avgRating ? `${result.avgRating}/10` : "Brak oceny"}
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="whitespace-nowrap"
+                          disabled={isOnWatchlist || isPending}
+                          aria-label={isOnWatchlist ? "Film jest już na watchliście" : `Dodaj ${result.primaryTitle} do watchlist`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void handleAddToWatchlist(result);
+                          }}
+                          onMouseDown={(event) => event.preventDefault()}
+                        >
+                          + do watchlist
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="whitespace-nowrap"
+                          disabled={isPending || isWatched}
+                          aria-label={isWatched ? "Film jest już na liście obejrzanych" : `Dodaj ${result.primaryTitle} do obejrzanych`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void handleAddToWatched(result);
+                          }}
+                          onMouseDown={(event) => event.preventDefault()}
+                        >
+                          + do obejrzane
+                        </Button>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {result.startYear && `${result.startYear} • `}
-                      {result.avgRating ? `${result.avgRating}/10` : "Brak oceny"}
-                    </div>
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </PopoverContent>
