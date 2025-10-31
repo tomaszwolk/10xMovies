@@ -11,6 +11,8 @@ Domyślne klasy w PopoverContent:
 
 ⚠️ **Problem:** Używa `bg-popover` jako domyślne tło, które może być nadpisywane przez `className` prop, ale z powodu specyficzności CSS może nie działać.
 
+✅ **Rozwiązanie:** W pliku `components/ui/popover.tsx` zastąpiliśmy klasę `bg-popover` neutralną wartością `bg-transparent`, dzięki czemu kolor możemy narzucać z zewnątrz bez walki o specyficzność.
+
 ---
 
 ## 2. **Zmienne CSS dla kolorów**
@@ -34,6 +36,12 @@ Domyślne klasy w PopoverContent:
 
 ⚠️ **Problem:** Kolory `--popover` i `--muted` są bardzo zbliżone do `--background`, co daje małą widoczność.
 
+✅ **Rozwiązanie:** Dodaliśmy dedykowaną zmienną CSS `--search-popover-background`:
+- w `:root` (tryb jasny) ustawioną na `rgba(255, 255, 255, 0.95)`
+- w `:root.dark` (tryb ciemny) ustawioną na `rgba(0, 0, 0, 0.95)`
+
+Zmienna jest używana jako tło dropdownu wyszukiwania niezależnie od motywu.
+
 ---
 
 ## 3. **SearchCombobox - PopoverContent**
@@ -47,6 +55,8 @@ className="w-full p-0 bg-card text-foreground border border-border shadow-lg"
 
 **Status:** ✅ Zmienione na `bg-card`, ale może być nadpisane przez domyślne klasy z popover.tsx
 
+✅ **Rozwiązanie końcowe:** PopoverContent otrzymuje inline styl `backgroundColor: 'var(--search-popover-background)'`, więc nawet po zmianie motywu zachowuje odpowiednie krycie.
+
 ---
 
 ## 4. **SearchCombobox - Lista wyników**
@@ -59,6 +69,8 @@ className="max-h-60 overflow-y-auto divide-y divide-border bg-card"
 ```
 
 **Status:** ✅ Zmienione na `bg-card`
+
+✅ **Rozwiązanie końcowe:** Przechodzimy na `style={{ backgroundColor: 'var(--search-popover-background)' }}`, aby lista wyników dziedziczyła ten sam kolor co kontener.
 
 ---
 
