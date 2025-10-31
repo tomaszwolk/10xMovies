@@ -53,13 +53,19 @@ export function SearchCombobox({ onAddToWatchlist, onAddToWatched, existingTcons
     inputRef.current?.focus();
   };
 
-  const executeAction = async (action: () => Promise<void> | void) => {
+  const executeAction = async (
+    action: () => Promise<void> | void,
+    options: { shouldReset?: boolean } = {}
+  ) => {
+    const { shouldReset = true } = options;
     try {
       const maybePromise = action();
       if (maybePromise instanceof Promise) {
         await maybePromise;
       }
-      closeAndReset();
+      if (shouldReset) {
+        closeAndReset();
+      }
     } catch (error) {
       // Error feedback is handled by the caller (toast notifications).
     } finally {
@@ -77,7 +83,7 @@ export function SearchCombobox({ onAddToWatchlist, onAddToWatched, existingTcons
     }
 
     setPendingTconst(result.tconst);
-    await executeAction(() => onAddToWatchlist(result.tconst));
+    await executeAction(() => onAddToWatchlist(result.tconst), { shouldReset: false });
   };
 
   const handleAddToWatched = async (result: SearchOptionVM) => {
@@ -90,7 +96,7 @@ export function SearchCombobox({ onAddToWatchlist, onAddToWatched, existingTcons
     }
 
     setPendingTconst(result.tconst);
-    await executeAction(() => onAddToWatched(result.tconst));
+    await executeAction(() => onAddToWatched(result.tconst), { shouldReset: false });
   };
 
   const handleInputChange = (value: string) => {
@@ -154,7 +160,9 @@ export function SearchCombobox({ onAddToWatchlist, onAddToWatched, existingTcons
               aria-label="Wyszukaj film"
             />
             {isLoading && (
-              <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 animate-spin" />
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+              </div>
             )}
           </div>
         </PopoverTrigger>

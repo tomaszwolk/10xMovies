@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -7,6 +8,9 @@ import { useUserMoviesWatched } from "@/hooks/useUserMoviesWatched";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { usePlatforms } from "@/hooks/usePlatforms";
 import { useRestoreToWatchlist } from "@/hooks/useWatchedActions";
+import { useAddMovie } from "@/hooks/useAddMovie";
+import { useListUserMovies } from "@/hooks/useListUserMovies";
+import { usePatchUserMovie } from "@/hooks/usePatchUserMovie";
 
 // Components
 import { WatchedToolbar } from "@/components/watched/WatchedToolbar";
@@ -45,9 +49,12 @@ export function WatchedPage() {
     sortKey: sort,
     userPlatforms: userProfileQuery.data?.platforms || [],
   });
+  const watchlistQuery = useListUserMovies('watchlist');
 
   // Actions
   const restoreMutation = useRestoreToWatchlist();
+  const addMovieMutation = useAddMovie();
+  const patchUserMovieMutation = usePatchUserMovie();
 
   // Handlers
   const handleViewModeChange = (mode: typeof viewMode) => {
@@ -62,8 +69,95 @@ export function WatchedPage() {
     restoreMutation.mutate(id);
   };
 
+  const watchedEntriesByTconst = useMemo(() => {
+    const map = new Map<string, number>();
+    (watchedQuery.items ?? []).forEach(entry => {
+      map.set(entry.tconst, entry.id);
+    });
+    return map;
+  }, [watchedQuery.items]);
+
+  const watchlistEntriesByTconst = useMemo(() => {
+    const map = new Map<string, number>();
+    (watchlistQuery.data ?? []).forEach(entry => {
+      map.set(entry.movie.tconst, entry.id);
+    });
+    return map;
+  }, [watchlistQuery.data]);
+
+  const existingWatchlistTconsts = useMemo(
+    () => Array.from(watchlistEntriesByTconst.keys()),
+    [watchlistEntriesByTconst]
+  );
+
+  const existingWatchedTconsts = useMemo(
+    () => Array.from(watchedEntriesByTconst.keys()),
+    [watchedEntriesByTconst]
+  );
+
+  const handleAddToWatchlist = async (tconst: string) => {
+    if (watchlistEntriesByTconst.has(tconst)) {
+      toast.info("Ten film jest już na Twojej watchliście");
+      return;
+    }
+
+    const watchedId = watchedEntriesByTconst.get(tconst);
+
+    try {
+      if (watchedId) {
+        const result = await patchUserMovieMutation.mutateAsync({
+          id: watchedId,
+          command: { action: 'restore_to_watchlist' },
+        });
+        toast.success(`"${result.movie.primary_title}" przywrócono do watchlisty`);
+        return;
+      }
+
+      const result = await addMovieMutation.mutateAsync({ tconst });
+      toast.success(`"${result.primaryTitle}" dodano do watchlisty`);
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        (error as any).response?.status === 409
+      ) {
+        toast.info("Ten film jest już na Twojej watchliście");
+      } else {
+        toast.error("Nie udało się dodać filmu do watchlisty");
+      }
+    }
+  };
+
+  const handleAddToWatched = async (tconst: string) => {
+    if (watchedEntriesByTconst.has(tconst)) {
+      toast.info("Ten film był już oznaczony jako obejrzany");
+      return;
+    }
+
+    try {
+      const result = await addMovieMutation.mutateAsync({ tconst, mark_as_watched: true });
+      toast.success(`"${result.primaryTitle}" dodano do obejrzanych`);
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        (error as any).response?.status === 409
+      ) {
+        toast.info("Ten film był już oznaczony jako obejrzany");
+      } else {
+        toast.error("Nie udało się dodać filmu do obejrzanych");
+      }
+    }
+  };
+
   // Loading states
-  const isLoading = watchedQuery.isLoading || userProfileQuery.isLoading || platformsQuery.isLoading;
+  const isLoading =
+    watchedQuery.isLoading ||
+    userProfileQuery.isLoading ||
+    platformsQuery.isLoading ||
+    watchlistQuery.isLoading;
 
   return (
     <div className="min-h-screen bg-background">
@@ -108,6 +202,10 @@ export function WatchedPage() {
             onViewModeChange={handleViewModeChange}
             sortKey={sort}
             onSortKeyChange={handleSortChange}
+            onAddToWatchlist={handleAddToWatchlist}
+            onAddToWatched={handleAddToWatched}
+            existingWatchlistTconsts={existingWatchlistTconsts}
+            existingWatchedTconsts={existingWatchedTconsts}
           />
         </div>
 
