@@ -22,7 +22,7 @@ export function WatchedList({ items, platforms, onRestore, isRestoring }: Watche
   }
 
   return (
-    <div className="space-y-3 p-4">
+    <div className="space-y-3">
       {items.map((item) => (
         <UserMovieRow
           key={item.id}

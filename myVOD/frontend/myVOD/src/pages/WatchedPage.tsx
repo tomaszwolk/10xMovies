@@ -18,6 +18,9 @@ import { WatchedToolbar } from "@/components/watched/WatchedToolbar";
 import { WatchedContent } from "@/components/watched/WatchedContent";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MediaLibraryLayout } from "@/components/library/MediaLibraryLayout";
+import { useAISuggestionsHandler } from "@/hooks/useAISuggestionsHandler";
+import { SuggestionModal } from "@/components/watchlist/SuggestionModal";
+import { ToastViewport } from "@/components/watchlist/ToastViewport";
 
 /**
  * Main watched movies page component.
@@ -57,6 +60,7 @@ export function WatchedPage() {
   const restoreMutation = useRestoreToWatchlist();
   const addMovieMutation = useAddMovie();
   const patchUserMovieMutation = usePatchUserMovie();
+  const suggestionsHandler = useAISuggestionsHandler();
 
   // Handlers
   const handleViewModeChange = (mode: typeof viewMode) => {
@@ -173,6 +177,14 @@ export function WatchedPage() {
     </div>
   );
 
+  const handleSuggest = () => {
+    suggestionsHandler.handleSuggestClick();
+  };
+
+  const handleAddFromSuggestion = (tconst: string) => {
+    suggestionsHandler.addFromSuggestion(tconst);
+  };
+
   const tabs = [
     {
       id: "watchlist",
@@ -189,33 +201,46 @@ export function WatchedPage() {
   ];
 
   return (
-    <MediaLibraryLayout
-      title="Obejrzane filmy"
-      subtitle="Historia filmów, które już obejrzałeś"
-      tabs={tabs}
-      headerActions={headerActions}
-      toolbar={
-        <WatchedToolbar
+    <>
+      <MediaLibraryLayout
+        title="Obejrzane filmy"
+        subtitle="Historia filmów, które już obejrzałeś"
+        tabs={tabs}
+        headerActions={headerActions}
+        toolbar={
+          <WatchedToolbar
+            viewMode={viewMode}
+            onViewModeChange={handleViewModeChange}
+            sortKey={sort}
+            onSortKeyChange={handleSortChange}
+            onAddToWatchlist={handleAddToWatchlist}
+            onAddToWatched={handleAddToWatched}
+            existingWatchlistTconsts={existingWatchlistTconsts}
+            existingWatchedTconsts={existingWatchedTconsts}
+            onSuggest={handleSuggest}
+            isSuggestDisabled={suggestionsHandler.isSuggestDisabled}
+          />
+        }
+      >
+        <WatchedContent
+          items={watchedQuery.items}
           viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
-          sortKey={sort}
-          onSortKeyChange={handleSortChange}
-          onAddToWatchlist={handleAddToWatchlist}
-          onAddToWatched={handleAddToWatched}
-          existingWatchlistTconsts={existingWatchlistTconsts}
-          existingWatchedTconsts={existingWatchedTconsts}
+          platforms={platformsQuery.data || []}
+          isLoading={isLoading}
+          isEmpty={watchedQuery.isEmpty}
+          onRestore={handleRestore}
+          isRestoring={restoreMutation.isPending}
         />
-      }
-    >
-      <WatchedContent
-        items={watchedQuery.items}
-        viewMode={viewMode}
-        platforms={platformsQuery.data || []}
-        isLoading={isLoading}
-        isEmpty={watchedQuery.isEmpty}
-        onRestore={handleRestore}
-        isRestoring={restoreMutation.isPending}
+      </MediaLibraryLayout>
+
+      <SuggestionModal
+        open={suggestionsHandler.isModalOpen}
+        onOpenChange={suggestionsHandler.closeModal}
+        data={suggestionsHandler.suggestionsData || null}
+        onAdd={handleAddFromSuggestion}
       />
-    </MediaLibraryLayout>
+
+      <ToastViewport />
+    </>
   );
 }

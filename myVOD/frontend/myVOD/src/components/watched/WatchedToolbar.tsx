@@ -2,6 +2,7 @@ import { WatchedViewToggle } from "./WatchedViewToggle";
 import { WatchedSortDropdown } from "./WatchedSortDropdown";
 import { SearchCombobox } from "../watchlist/SearchCombobox";
 import { MediaToolbar } from "@/components/library/MediaToolbar";
+import { SuggestAIButton } from "@/components/watchlist/SuggestAIButton";
 import type { WatchedViewMode, WatchedSortKey } from "@/types/view/watched.types";
 
 /**
@@ -16,6 +17,8 @@ type WatchedToolbarProps = {
   onAddToWatched: (tconst: string) => Promise<void> | void;
   existingWatchlistTconsts: string[];
   existingWatchedTconsts: string[];
+  onSuggest: () => void;
+  isSuggestDisabled: boolean;
 };
 
 /**
@@ -31,6 +34,8 @@ export function WatchedToolbar({
   onAddToWatched,
   existingWatchlistTconsts,
   existingWatchedTconsts,
+  onSuggest,
+  isSuggestDisabled,
 }: WatchedToolbarProps) {
   return (
     <MediaToolbar
@@ -40,6 +45,12 @@ export function WatchedToolbar({
           onAddToWatched={onAddToWatched}
           existingTconsts={existingWatchlistTconsts}
           existingWatchedTconsts={existingWatchedTconsts}
+        />
+      }
+      primaryActionsSlot={
+        <SuggestAIButton
+          onClick={onSuggest}
+          disabled={isSuggestDisabled}
         />
       }
       viewControlsSlot={
