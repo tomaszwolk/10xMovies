@@ -35,8 +35,17 @@ class UserMovieSerializer(serializers.ModelSerializer):
         fields = ["id", "movie", "availability", "watchlisted_at", "watched_at"]
 
     def get_availability(self, obj):
-        """Get availability data from prefetched attribute or return empty list."""
+        """Get availability data from prefetched attribute or query directly."""
+        # First try prefetched data
         availability_data = getattr(obj, 'availability_filtered', [])
+
+        # If no prefetched data, try direct query as fallback
+        if not availability_data:
+            from movies.models import MovieAvailability
+            availability_data = list(MovieAvailability.objects.filter(
+                tconst=obj.tconst.tconst
+            ).select_related('platform'))
+
         return MovieAvailabilitySerializer(availability_data, many=True).data
 
 

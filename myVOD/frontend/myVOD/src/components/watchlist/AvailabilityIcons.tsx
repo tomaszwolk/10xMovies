@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { getPlatformIcon } from "@/components/onboarding/platformIcons";
 import type { MovieAvailabilityDto, PlatformDto } from "@/types/api.types";
 
 /**
@@ -11,24 +12,6 @@ type AvailabilityIconsProps = {
   platforms: PlatformDto[];
 };
 
-/**
- * Icon mapping for different platforms.
- * Maps platform slugs to Lucide icons.
- */
-const PLATFORM_ICONS: Record<string, string> = {
-  'netflix': '🎬',
-  'hbo': '📺',
-  'amazon-prime': '📦',
-  'disney-plus': '🐭',
-  'hulu': '📱',
-  'max': '🎭',
-  'apple-tv': '🍎',
-  'paramount-plus': '📡',
-  'peacock': '🦚',
-  'crave': '🎯',
-  // Fallback for unknown platforms
-  'default': '📺',
-};
 
 /**
  * Displays availability icons for movie platforms.
@@ -57,7 +40,7 @@ export const AvailabilityIcons = memo<AvailabilityIconsProps>(function Availabil
           const platform = platformMap.get(avail.platform_id);
           if (!platform) return null;
 
-          const icon = PLATFORM_ICONS[platform.platform_slug] || PLATFORM_ICONS.default;
+          const IconComponent = getPlatformIcon(platform.platform_slug);
           const isAvailable = avail.is_available === true;
           const tooltipText = `${platform.platform_name}: ${isAvailable ? 'Dostępny' : 'Niedostępny'}`;
 
@@ -72,7 +55,7 @@ export const AvailabilityIcons = memo<AvailabilityIconsProps>(function Availabil
                   }`}
                   title={tooltipText}
                 >
-                  {icon}
+                  {IconComponent && <IconComponent className="w-4 h-4" />}
                 </div>
               </TooltipTrigger>
               <TooltipContent>

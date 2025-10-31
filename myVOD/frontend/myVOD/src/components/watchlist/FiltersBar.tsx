@@ -1,4 +1,3 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -26,18 +25,11 @@ export function FiltersBar({
   totalCount,
   hasUserPlatforms,
 }: FiltersBarProps) {
-  const handleOnlyAvailableChange = (checked: boolean) => {
+  const handleToggleUnavailable = () => {
+    // Toggle between showing all movies and showing only available movies
     onChange({
       ...filters,
-      onlyAvailable: checked,
-    });
-  };
-
-  const handleHideUnavailableChange = () => {
-    // "Ukryj niedostępne" sets onlyAvailable to true
-    onChange({
-      ...filters,
-      onlyAvailable: true,
+      onlyAvailable: !filters.onlyAvailable,
     });
   };
 
@@ -46,22 +38,15 @@ export function FiltersBar({
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="only-available"
-                checked={filters.onlyAvailable}
-                onCheckedChange={handleOnlyAvailableChange}
-                disabled={!hasUserPlatforms}
-              />
-              <label
-                htmlFor="only-available"
-                className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
-                  !hasUserPlatforms ? "text-muted-foreground" : "text-foreground cursor-pointer"
-                }`}
-              >
-                Tylko dostępne
-              </label>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleUnavailable}
+              disabled={!hasUserPlatforms}
+              className="text-sm"
+            >
+              {filters.onlyAvailable ? "Pokaż niedostępne" : "Ukryj niedostępne"}
+            </Button>
           </TooltipTrigger>
           {!hasUserPlatforms && (
             <TooltipContent>
@@ -69,16 +54,6 @@ export function FiltersBar({
             </TooltipContent>
           )}
         </Tooltip>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleHideUnavailableChange}
-          disabled={!hasUserPlatforms}
-          className="text-sm"
-        >
-          Ukryj niedostępne
-        </Button>
       </TooltipProvider>
 
       <Badge variant="secondary" className="text-xs">
