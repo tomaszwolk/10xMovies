@@ -53,18 +53,33 @@ def build_user_movies_queryset(
         to_attr='availability_filtered'
     )
 
-    queryset = (
-        UserMovie.objects.filter(user_id=supabase_user_uuid, watchlist_deleted_at__isnull=True)
-        .select_related('tconst')
-        .prefetch_related(availability_prefetch)
-    )
-
     if status_param == 'watchlist':
-        queryset = queryset.filter(
-            watchlisted_at__isnull=False,
+        queryset = (
+            UserMovie.objects.filter(
+                user_id=supabase_user_uuid,
+                watchlist_deleted_at__isnull=True,
+                watchlisted_at__isnull=False,
+                watched_at__isnull=True  # Not watched yet
+            )
+            .select_related('tconst')
+            .prefetch_related(availability_prefetch)
         )
     elif status_param == 'watched':
-        queryset = queryset.filter(watched_at__isnull=False)
+        queryset = (
+            UserMovie.objects.filter(
+                user_id=supabase_user_uuid,
+                watched_at__isnull=False  # Is watched
+            )
+            .select_related('tconst')
+            .prefetch_related(availability_prefetch)
+        )
+    else:
+        # Fallback for other status values
+        queryset = (
+            UserMovie.objects.filter(user_id=supabase_user_uuid, watchlist_deleted_at__isnull=True)
+            .select_related('tconst')
+            .prefetch_related(availability_prefetch)
+        )
 
     if is_available is True:
         # Use EXISTS subquery for better performance (no materialized list)
@@ -310,9 +325,11 @@ def update_user_movie(*, user, user_movie_id: int, action: str):
         if user_movie.watched_at is not None:
             raise ValueError("Movie is already marked as watched")
 
-        # Update watched_at to current timestamp
-        user_movie.watched_at = timezone.now()
-        user_movie.save(update_fields=['watched_at'])
+        # Update watched_at and soft-delete from watchlist
+        now = timezone.now()
+        user_movie.watched_at = now
+        user_movie.watchlist_deleted_at = now
+        user_movie.save(update_fields=['watched_at', 'watchlist_deleted_at'])
 
     # Handle restore_to_watchlist action
     elif action == 'restore_to_watchlist':
@@ -320,9 +337,10 @@ def update_user_movie(*, user, user_movie_id: int, action: str):
         if user_movie.watched_at is None:
             raise ValueError("Movie is not marked as watched, cannot restore to watchlist")
 
-        # Clear watched_at (set to NULL)
+        # Clear watched_at and restore to watchlist (clear soft-delete)
         user_movie.watched_at = None
-        user_movie.save(update_fields=['watched_at'])
+        user_movie.watchlist_deleted_at = None
+        user_movie.save(update_fields=['watched_at', 'watchlist_deleted_at'])
 
     # Fetch with related data for response
     platform_ids = _get_user_platform_ids(supabase_user_uuid)

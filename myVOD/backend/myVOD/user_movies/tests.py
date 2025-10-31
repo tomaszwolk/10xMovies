@@ -747,6 +747,7 @@ class UserMoviePatchAPITests(APITestCase):
     def test_patch_preserves_other_fields(self):
         original_movie = UserMovie.objects.get(id=self.user_movie_watchlist.id)
         original_added_from_ai = original_movie.added_from_ai_suggestion
+        original_watchlisted_at = original_movie.watchlisted_at
 
         self.client.force_authenticate(user=self.user1)
         patch_url = f"{self.url}{self.user_movie_watchlist.id}/"
@@ -760,7 +761,9 @@ class UserMoviePatchAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         updated_movie = UserMovie.objects.get(id=self.user_movie_watchlist.id)
-        self.assertIsNone(updated_movie.watchlist_deleted_at)
+        self.assertIsNotNone(updated_movie.watchlist_deleted_at)  # Should be soft-deleted from watchlist
+        self.assertIsNotNone(updated_movie.watched_at)  # Should be marked as watched
+        self.assertEqual(updated_movie.watchlisted_at, original_watchlisted_at)  # Should preserve original watchlist date
         self.assertEqual(updated_movie.added_from_ai_suggestion, original_added_from_ai)
 
     def test_patch_availability_filtered_by_user_platforms(self):
@@ -795,6 +798,7 @@ class UserMoviePatchAPITests(APITestCase):
 
         movie_after_mark = UserMovie.objects.get(id=self.user_movie_watchlist.id)
         self.assertIsNotNone(movie_after_mark.watched_at)
+        self.assertIsNotNone(movie_after_mark.watchlist_deleted_at)  # Should be soft-deleted from watchlist
 
         response2 = self.client.patch(
             patch_url,
@@ -806,6 +810,7 @@ class UserMoviePatchAPITests(APITestCase):
 
         movie_after_restore = UserMovie.objects.get(id=self.user_movie_watchlist.id)
         self.assertIsNone(movie_after_restore.watched_at)
+        self.assertIsNone(movie_after_restore.watchlist_deleted_at)  # Should be restored to watchlist
 
     def test_patch_idempotent_sequence(self):
         self.client.force_authenticate(user=self.user1)

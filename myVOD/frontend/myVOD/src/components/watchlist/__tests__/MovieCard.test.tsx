@@ -76,9 +76,9 @@ describe('MovieCard', () => {
   it('should show availability icons for user platforms', () => {
     render(<MovieCard {...defaultProps} />);
 
-    // Should show platform icons (emoji representation)
-    const availabilityIcons = screen.getAllByText('🎬'); // Netflix emoji
-    expect(availabilityIcons.length).toBeGreaterThan(0);
+    // Should show platform icons with tooltips
+    expect(screen.getByTitle('Netflix: Dostępny')).toBeInTheDocument();
+    expect(screen.getByTitle('HBO: Niedostępny')).toBeInTheDocument();
   });
 
   it('should not show unavailable badge when movie is available', () => {

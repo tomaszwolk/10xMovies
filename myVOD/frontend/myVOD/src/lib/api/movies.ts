@@ -62,14 +62,32 @@ export async function deleteUserMovie(id: number): Promise<void> {
 }
 
 /**
- * List user movies filtered by status.
- * Corresponds to GET /api/user-movies/?status=<status>
+ * List user movies filtered by status and ordering.
+ * Corresponds to GET /api/user-movies/?status=<status>&ordering=<ordering>
  * @param status - Filter by status ('watchlist' or 'watched')
+ * @param ordering - Optional ordering parameter
  * @returns Promise<UserMovieDto[]>
  */
-export async function listUserMovies(status?: 'watchlist' | 'watched'): Promise<UserMovieDto[]> {
+export async function listUserMovies(status?: 'watchlist' | 'watched', ordering?: string): Promise<UserMovieDto[]> {
+  const params: Record<string, string> = {};
+  if (status) params.status = status;
+  if (ordering) params.ordering = ordering;
+
   const response = await http.get<UserMovieDto[]>("/user-movies/", {
-    params: status ? { status } : undefined,
+    params: Object.keys(params).length > 0 ? params : undefined,
+  });
+  return response.data;
+}
+
+/**
+ * Restore a movie from watched back to watchlist.
+ * Corresponds to PATCH /api/user-movies/:id with action: 'restore_to_watchlist'
+ * @param id - User movie ID
+ * @returns Promise<UserMovieDto>
+ */
+export async function restoreUserMovie(id: number): Promise<UserMovieDto> {
+  const response = await http.patch<UserMovieDto>(`/user-movies/${id}/`, {
+    action: 'restore_to_watchlist'
   });
   return response.data;
 }

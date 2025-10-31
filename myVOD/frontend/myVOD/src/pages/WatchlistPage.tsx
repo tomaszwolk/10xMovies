@@ -146,6 +146,18 @@ export function WatchlistPage() {
             <p className="text-muted-foreground">
               Zarządzaj swoimi filmami do obejrzenia
             </p>
+            {/* Navigation Tabs */}
+            <div className="flex gap-1 mt-4">
+              <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium">
+                Watchlista
+              </button>
+              <button
+                onClick={() => navigate('/app/watched')}
+                className="px-4 py-2 bg-muted hover:bg-muted/80 text-muted-foreground rounded-lg transition-colors"
+              >
+                Obejrzane
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle key="theme-toggle" />
