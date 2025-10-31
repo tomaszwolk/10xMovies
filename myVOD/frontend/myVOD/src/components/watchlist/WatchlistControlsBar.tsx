@@ -3,6 +3,7 @@ import { ViewToggle } from "./ViewToggle";
 import { SortDropdown } from "./SortDropdown";
 import { FiltersBar } from "./FiltersBar";
 import { SuggestAIButton } from "./SuggestAIButton";
+import { MediaToolbar } from "@/components/library/MediaToolbar";
 import type { ViewMode, SortOption, FiltersState } from "@/types/view/watchlist.types";
 
 /**
@@ -48,45 +49,42 @@ export function WatchlistControlsBar({
   existingWatchedTconsts,
 }: WatchlistControlsBarProps) {
   return (
-    <div className="bg-card border-b px-4 py-3">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        {/* Left section: Search and AI suggestions */}
-        <div className="flex flex-col sm:flex-row gap-3 lg:flex-1">
-          <div className="flex-1 max-w-md">
-            <SearchCombobox
-              onAddToWatchlist={onAddToWatchlist}
-              onAddToWatched={onAddToWatched}
-              existingTconsts={existingTconsts}
-              existingWatchedTconsts={existingWatchedTconsts}
-            />
-          </div>
-          <SuggestAIButton
-            onClick={onSuggest}
-            disabled={isSuggestDisabled}
+    <MediaToolbar
+      searchSlot={
+        <SearchCombobox
+          onAddToWatchlist={onAddToWatchlist}
+          onAddToWatched={onAddToWatched}
+          existingTconsts={existingTconsts}
+          existingWatchedTconsts={existingWatchedTconsts}
+        />
+      }
+      primaryActionsSlot={
+        <SuggestAIButton
+          onClick={onSuggest}
+          disabled={isSuggestDisabled}
+        />
+      }
+      viewControlsSlot={
+        <>
+          <ViewToggle
+            value={viewMode}
+            onChange={onViewModeChange}
           />
-        </div>
-
-        {/* Right section: View controls */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex items-center gap-3">
-            <ViewToggle
-              value={viewMode}
-              onChange={onViewModeChange}
-            />
-            <SortDropdown
-              value={sort}
-              onChange={onSortChange}
-            />
-          </div>
-          <FiltersBar
-            filters={filters}
-            onChange={onFiltersChange}
-            visibleCount={visibleCount}
-            totalCount={totalCount}
-            hasUserPlatforms={hasUserPlatforms}
+          <SortDropdown
+            value={sort}
+            onChange={onSortChange}
           />
-        </div>
-      </div>
-    </div>
+        </>
+      }
+      secondaryControlsSlot={
+        <FiltersBar
+          filters={filters}
+          onChange={onFiltersChange}
+          visibleCount={visibleCount}
+          totalCount={totalCount}
+          hasUserPlatforms={hasUserPlatforms}
+        />
+      }
+    />
   );
 }

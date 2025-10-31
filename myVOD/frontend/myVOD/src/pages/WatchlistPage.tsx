@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/watchlist/ConfirmDialog";
 import { SuggestionModal } from "@/components/watchlist/SuggestionModal";
 import { ToastViewport } from "@/components/watchlist/ToastViewport";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { MediaLibraryLayout } from "@/components/library/MediaLibraryLayout";
 
 /**
  * Main watchlist page component.
@@ -204,44 +205,41 @@ export function WatchlistPage() {
   // Check if user has selected platforms for availability filtering
   const hasUserPlatforms = (userProfileQuery.data?.platforms?.length || 0) > 0;
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-4 lg:p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl lg:text-4xl font-bold text-foreground mb-2">
-              Moja lista filmów
-            </h1>
-            <p className="text-muted-foreground">
-              Zarządzaj swoimi filmami do obejrzenia
-            </p>
-            {/* Navigation Tabs */}
-            <div className="flex gap-1 mt-4">
-              <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium">
-                Watchlista
-              </button>
-              <button
-                onClick={() => navigate('/app/watched')}
-                className="px-4 py-2 bg-muted hover:bg-muted/80 text-muted-foreground rounded-lg transition-colors"
-              >
-                Obejrzane
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle key="theme-toggle" />
-            <button
-              onClick={logout}
-              className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg transition-colors"
-            >
-              Wyloguj się
-            </button>
-          </div>
-        </div>
+  const headerActions = (
+    <div className="flex items-center gap-3">
+      <ThemeToggle key="theme-toggle" />
+      <button
+        onClick={logout}
+        className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg transition-colors"
+      >
+        Wyloguj się
+      </button>
+    </div>
+  );
 
-        {/* Controls Bar */}
-        <div className="mb-6">
+  const tabs = [
+    {
+      id: "watchlist",
+      label: "Watchlista",
+      isActive: true,
+      onSelect: () => {},
+    },
+    {
+      id: "watched",
+      label: "Obejrzane",
+      isActive: false,
+      onSelect: () => navigate("/app/watched"),
+    },
+  ];
+
+  return (
+    <>
+      <MediaLibraryLayout
+        title="Moja lista filmów"
+        subtitle="Zarządzaj swoimi filmami do obejrzenia"
+        tabs={tabs}
+        headerActions={headerActions}
+        toolbar={
           <WatchlistControlsBar
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
@@ -259,44 +257,39 @@ export function WatchlistPage() {
             existingTconsts={existingTconsts}
             existingWatchedTconsts={existingWatchedTconsts}
           />
-        </div>
-
-        {/* Main Content */}
-        <div className="bg-card rounded-lg shadow-lg overflow-hidden border">
-          <WatchlistContent
-            items={items}
-            viewMode={viewMode}
-            isLoading={isLoading}
-            platforms={platformsQuery.data || []}
-            onMarkWatched={handleMarkWatched}
-            onDelete={handleDelete}
-            onAddToWatchlist={handleAddToWatchlist}
-            onAddToWatched={handleAddToWatched}
-            existingTconsts={existingTconsts}
-            existingWatchedTconsts={existingWatchedTconsts}
-          />
-        </div>
-
-        {/* Dialogs */}
-        <ConfirmDialog
-          open={confirmDialog.open}
-          onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
-          title={confirmDialog.title}
-          message={confirmDialog.message}
-          onConfirm={confirmDialog.onConfirm}
+        }
+      >
+        <WatchlistContent
+          items={items}
+          viewMode={viewMode}
+          isLoading={isLoading}
+          platforms={platformsQuery.data || []}
+          onMarkWatched={handleMarkWatched}
+          onDelete={handleDelete}
+          onAddToWatchlist={handleAddToWatchlist}
+          onAddToWatched={handleAddToWatched}
+          existingTconsts={existingTconsts}
+          existingWatchedTconsts={existingWatchedTconsts}
         />
+      </MediaLibraryLayout>
 
-        <SuggestionModal
-          open={suggestionsHandler.isModalOpen}
-          onOpenChange={suggestionsHandler.closeModal}
-          data={suggestionsHandler.suggestionsData || null}
-          onAdd={handleAddFromSuggestion}
-        />
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+      />
 
-        {/* Toast notifications */}
-        <ToastViewport />
-      </div>
-    </div>
+      <SuggestionModal
+        open={suggestionsHandler.isModalOpen}
+        onOpenChange={suggestionsHandler.closeModal}
+        data={suggestionsHandler.suggestionsData || null}
+        onAdd={handleAddFromSuggestion}
+      />
+
+      <ToastViewport />
+    </>
   );
 }
 

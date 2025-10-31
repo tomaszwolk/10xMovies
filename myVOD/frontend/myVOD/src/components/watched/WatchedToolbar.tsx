@@ -1,6 +1,7 @@
 import { WatchedViewToggle } from "./WatchedViewToggle";
 import { WatchedSortDropdown } from "./WatchedSortDropdown";
 import { SearchCombobox } from "../watchlist/SearchCombobox";
+import { MediaToolbar } from "@/components/library/MediaToolbar";
 import type { WatchedViewMode, WatchedSortKey } from "@/types/view/watched.types";
 
 /**
@@ -32,20 +33,17 @@ export function WatchedToolbar({
   existingWatchedTconsts,
 }: WatchedToolbarProps) {
   return (
-    <div className="bg-card border-b px-4 py-3">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        {/* Left section: Search */}
-        <div className="flex-1 max-w-md">
-          <SearchCombobox
-            onAddToWatchlist={onAddToWatchlist}
-            onAddToWatched={onAddToWatched}
-            existingTconsts={existingWatchlistTconsts}
-            existingWatchedTconsts={existingWatchedTconsts}
-          />
-        </div>
-
-        {/* Right section: View controls */}
-        <div className="flex items-center gap-3">
+    <MediaToolbar
+      searchSlot={
+        <SearchCombobox
+          onAddToWatchlist={onAddToWatchlist}
+          onAddToWatched={onAddToWatched}
+          existingTconsts={existingWatchlistTconsts}
+          existingWatchedTconsts={existingWatchedTconsts}
+        />
+      }
+      viewControlsSlot={
+        <>
           <WatchedViewToggle
             value={viewMode}
             onChange={onViewModeChange}
@@ -54,8 +52,8 @@ export function WatchedToolbar({
             value={sortKey}
             onChange={onSortKeyChange}
           />
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
