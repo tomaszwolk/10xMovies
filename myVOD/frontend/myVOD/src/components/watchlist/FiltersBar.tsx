@@ -56,7 +56,7 @@ export function FiltersBar({
               <label
                 htmlFor="only-available"
                 className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
-                  !hasUserPlatforms ? "text-gray-400" : "cursor-pointer"
+                  !hasUserPlatforms ? "text-gray-400" : "text-black cursor-pointer"
                 }`}
               >
                 Tylko dostępne

@@ -1,3 +1,6 @@
+// Enable dark mode immediately before any imports
+document.documentElement.classList.add('dark');
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
@@ -28,6 +31,7 @@ setupAxiosInterceptors(http, () => {
   // Redirect to login
   window.location.href = "/auth/login";
 });
+
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

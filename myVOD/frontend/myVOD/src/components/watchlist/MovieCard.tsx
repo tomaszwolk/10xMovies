@@ -48,7 +48,7 @@ export const MovieCard = memo<MovieCardProps>(function MovieCard({ item, platfor
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ImageIcon className="w-12 h-12 text-gray-400" />
+            <ImageIcon className="w-12 h-12 text-muted-foreground" />
           </div>
         )}
 
@@ -67,13 +67,13 @@ export const MovieCard = memo<MovieCardProps>(function MovieCard({ item, platfor
         {/* Title */}
         <h3
           id={`movie-title-${item.id}`}
-          className="font-medium text-sm line-clamp-2 mb-1"
+          className="font-medium text-sm line-clamp-2 mb-1 text-black"
         >
           {item.movie.primary_title}
         </h3>
 
         {/* Year, Genres, Rating */}
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
           {item.movie.start_year && (
             <span>{item.movie.start_year}</span>
           )}
@@ -116,7 +116,7 @@ export const MovieCard = memo<MovieCardProps>(function MovieCard({ item, platfor
             size="sm"
             variant="outline"
             onClick={() => onDelete(item.id)}
-            className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="flex items-center gap-2 text-red-600 border-red-300 hover:text-red-700 hover:bg-red-50"
             aria-label={`Usuń "${item.movie.primary_title}" z watchlisty`}
           >
             <Trash2 className="w-4 h-4" aria-hidden="true" />
