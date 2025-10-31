@@ -58,3 +58,11 @@ export async function getUserProfile(): Promise<UserProfileDto> {
   return data;
 }
 
+/**
+ * Delete the current user's account (GDPR compliance).
+ * @throws API error with status and data
+ */
+export async function deleteUserAccount(): Promise<void> {
+  await http.delete("/me/");
+}
+

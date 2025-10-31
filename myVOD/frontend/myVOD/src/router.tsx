@@ -7,6 +7,7 @@ import { AISuggestionsRoute } from "@/components/suggestions/AISuggestionsRoute"
 import { OnboardingPlatformsPage, OnboardingFirstMoviesPage, OnboardingAddPage, OnboardingWatchedPage } from "@/pages/onboarding";
 import { AppRoot } from "@/components/AppRoot";
 import { OnboardingGuard } from "@/components/OnboardingGuard";
+import { ProfilePage } from "@/pages/ProfilePage";
 import { useAuth } from "@/contexts/AuthContext";
 
 /**
@@ -75,6 +76,10 @@ export const router = createBrowserRouter([
       {
         path: "app/suggestions",
         element: <AISuggestionsRoute />,
+      },
+      {
+        path: "app/profile",
+        element: <ProfilePage />,
       },
       {
         path: "onboarding",
