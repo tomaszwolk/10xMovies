@@ -42,7 +42,7 @@ describe('useUserMoviesWatched', () => {
     mockListUserMovies.mockResolvedValue([]);
 
     const { result } = renderHook(
-      () => useUserMoviesWatched({ sortKey: 'watched_at_desc', userPlatforms: mockPlatforms }),
+      () => useUserMoviesWatched({ sortKey: 'added_desc', userPlatforms: mockPlatforms }),
       { wrapper }
     );
 
@@ -74,7 +74,7 @@ describe('useUserMoviesWatched', () => {
     mockListUserMovies.mockResolvedValue(mockData);
 
     const { result } = renderHook(
-      () => useUserMoviesWatched({ sortKey: 'watched_at_desc', userPlatforms: mockPlatforms }),
+      () => useUserMoviesWatched({ sortKey: 'added_desc', userPlatforms: mockPlatforms }),
       { wrapper }
     );
 
@@ -100,7 +100,7 @@ describe('useUserMoviesWatched', () => {
     mockListUserMovies.mockResolvedValue([]);
 
     renderHook(
-      () => useUserMoviesWatched({ sortKey: 'watched_at_desc', userPlatforms: mockPlatforms }),
+      () => useUserMoviesWatched({ sortKey: 'added_desc', userPlatforms: mockPlatforms }),
       { wrapper }
     );
 
@@ -111,7 +111,7 @@ describe('useUserMoviesWatched', () => {
     mockListUserMovies.mockResolvedValue([]);
 
     renderHook(
-      () => useUserMoviesWatched({ sortKey: 'rating_desc', userPlatforms: mockPlatforms }),
+      () => useUserMoviesWatched({ sortKey: 'imdb_desc', userPlatforms: mockPlatforms }),
       { wrapper }
     );
 
@@ -153,7 +153,7 @@ describe('useUserMoviesWatched', () => {
     mockListUserMovies.mockResolvedValue(mockData);
 
     const { result } = renderHook(
-      () => useUserMoviesWatched({ sortKey: 'watched_at_desc', userPlatforms: mockPlatforms }),
+      () => useUserMoviesWatched({ sortKey: 'added_desc', userPlatforms: mockPlatforms }),
       { wrapper }
     );
 
@@ -200,7 +200,7 @@ describe('useUserMoviesWatched', () => {
     mockListUserMovies.mockResolvedValue(mockData);
 
     const { result } = renderHook(
-      () => useUserMoviesWatched({ sortKey: 'watched_at_desc', userPlatforms: mockPlatforms }),
+      () => useUserMoviesWatched({ sortKey: 'added_desc', userPlatforms: mockPlatforms }),
       { wrapper }
     );
 
@@ -251,7 +251,7 @@ describe('useUserMoviesWatched', () => {
     mockListUserMovies.mockResolvedValue(mockData);
 
     const { result } = renderHook(
-      () => useUserMoviesWatched({ sortKey: 'watched_at_desc', userPlatforms: mockPlatforms }),
+      () => useUserMoviesWatched({ sortKey: 'added_desc', userPlatforms: mockPlatforms }),
       { wrapper }
     );
 

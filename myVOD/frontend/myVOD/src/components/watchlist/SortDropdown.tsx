@@ -41,13 +41,19 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
           <ChevronDown className="h-4 w-4 ml-2" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[200px]">
+      <DropdownMenuContent
+        align="end"
+        className="w-[200px]"
+        style={{
+          backgroundColor: "var(--search-popover-background)",
+        }}
+      >
         {(Object.entries(SORT_OPTIONS) as [SortOption, typeof SORT_OPTIONS[SortOption]][]).map(
           ([key, option]) => (
             <DropdownMenuItem
               key={key}
               onClick={() => onChange(key)}
-              className={value === key ? "bg-accent" : ""}
+              className={`${value === key ? "bg-accent" : ""} cursor-pointer`}
             >
               <div>
                 <div className="font-medium">{option.label}</div>

@@ -27,20 +27,32 @@ describe('useWatchedPreferences', () => {
     const { result } = renderHook(() => useWatchedPreferences());
 
     expect(result.current.viewMode).toBe('grid');
-    expect(result.current.sort).toBe('watched_at_desc');
+    expect(result.current.sort).toBe('added_desc');
   });
 
   it('should load stored preferences from localStorage', () => {
     localStorageMock.getItem.mockImplementation((key: string) => {
       if (key === 'watched:viewMode') return 'list';
-      if (key === 'watched:sort') return 'rating_desc';
+      if (key === 'watched:sort') return 'year_desc';
       return null;
     });
 
     const { result } = renderHook(() => useWatchedPreferences());
 
     expect(result.current.viewMode).toBe('list');
-    expect(result.current.sort).toBe('rating_desc');
+    expect(result.current.sort).toBe('year_desc');
+  });
+
+  it('should normalize legacy sort keys stored in localStorage', () => {
+    localStorageMock.getItem.mockImplementation((key: string) => {
+      if (key === 'watched:viewMode') return 'grid';
+      if (key === 'watched:sort') return 'rating_desc';
+      return null;
+    });
+
+    const { result } = renderHook(() => useWatchedPreferences());
+
+    expect(result.current.sort).toBe('imdb_desc');
   });
 
   it('should save preferences to localStorage when changed', () => {
@@ -53,10 +65,10 @@ describe('useWatchedPreferences', () => {
     expect(localStorageMock.setItem).toHaveBeenCalledWith('watched:viewMode', 'list');
 
     act(() => {
-      result.current.setSort('rating_desc');
+      result.current.setSort('imdb_desc');
     });
 
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('watched:sort', 'rating_desc');
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('watched:sort', 'imdb_desc');
   });
 
   it('should update viewMode correctly', () => {
@@ -74,13 +86,13 @@ describe('useWatchedPreferences', () => {
   it('should update sort correctly', () => {
     const { result } = renderHook(() => useWatchedPreferences());
 
-    expect(result.current.sort).toBe('watched_at_desc');
+    expect(result.current.sort).toBe('added_desc');
 
     act(() => {
-      result.current.setSort('rating_desc');
+      result.current.setSort('year_desc');
     });
 
-    expect(result.current.sort).toBe('rating_desc');
+    expect(result.current.sort).toBe('year_desc');
   });
 
   it('should persist preferences across re-renders', () => {
@@ -88,12 +100,12 @@ describe('useWatchedPreferences', () => {
 
     act(() => {
       result.current.setViewMode('list');
-      result.current.setSort('rating_desc');
+      result.current.setSort('imdb_desc');
     });
 
     rerender();
 
     expect(result.current.viewMode).toBe('list');
-    expect(result.current.sort).toBe('rating_desc');
+    expect(result.current.sort).toBe('imdb_desc');
   });
 });

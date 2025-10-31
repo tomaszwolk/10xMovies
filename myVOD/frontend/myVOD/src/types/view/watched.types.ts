@@ -1,10 +1,10 @@
 // Watched View Model Types
 
+import type { SortOption } from "./watchlist.types";
+
 export type WatchedViewMode = 'grid' | 'list';
 
-export type WatchedSortKey =
-  | 'watched_at_desc'      // domyślnie, sortowanie po stronie klienta
-  | 'rating_desc';         // sortowanie po stronie backendu (-tconst__avg_rating)
+export type WatchedSortKey = SortOption;
 
 export type WatchedMovieItemVM = {
   id: number;

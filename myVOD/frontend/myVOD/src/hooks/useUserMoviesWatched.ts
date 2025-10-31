@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { listUserMovies } from "@/lib/api/movies";
 import type { UserMovieDto, PlatformDto } from "@/types/api.types";
-import type { WatchedMovieItemVM, WatchedSortKey } from "@/types/view/watched.types";
+import type { WatchedMovieItemVM } from "@/types/view/watched.types";
+import type { SortOption } from "@/types/view/watchlist.types";
 
 /**
  * Formats a date string to a human-readable label for watched_at.
@@ -67,8 +68,32 @@ function sortByWatchedAtDesc(items: WatchedMovieItemVM[]): WatchedMovieItemVM[] 
 /**
  * Props for useUserMoviesWatched hook.
  */
+function sortByRatingDesc(items: WatchedMovieItemVM[]): WatchedMovieItemVM[] {
+  return [...items].sort((a, b) => {
+    const aRating = a.avgRating ? parseFloat(a.avgRating) : 0;
+    const bRating = b.avgRating ? parseFloat(b.avgRating) : 0;
+    return bRating - aRating;
+  });
+}
+
+function sortByYearDesc(items: WatchedMovieItemVM[]): WatchedMovieItemVM[] {
+  return [...items].sort((a, b) => {
+    const aYear = a.year || 0;
+    const bYear = b.year || 0;
+    return bYear - aYear;
+  });
+}
+
+function sortByYearAsc(items: WatchedMovieItemVM[]): WatchedMovieItemVM[] {
+  return [...items].sort((a, b) => {
+    const aYear = a.year || 0;
+    const bYear = b.year || 0;
+    return aYear - bYear;
+  });
+}
+
 type UseUserMoviesWatchedProps = {
-  sortKey: WatchedSortKey;
+  sortKey: SortOption;
   userPlatforms: PlatformDto[];
 };
 
@@ -78,8 +103,8 @@ type UseUserMoviesWatchedProps = {
  */
 export function useUserMoviesWatched({ sortKey, userPlatforms }: UseUserMoviesWatchedProps) {
   const query = useQuery<UserMovieDto[], Error>({
-    queryKey: ["user-movies", "watched", sortKey === 'rating_desc' ? { ordering: '-tconst__avg_rating' } : {}],
-    queryFn: () => listUserMovies('watched', sortKey === 'rating_desc' ? '-tconst__avg_rating' : undefined),
+    queryKey: ["user-movies", "watched", sortKey === 'imdb_desc' ? { ordering: '-tconst__avg_rating' } : {}],
+    queryFn: () => listUserMovies('watched', sortKey === 'imdb_desc' ? '-tconst__avg_rating' : undefined),
     staleTime: 30_000, // Consider data fresh for 30 seconds
   });
 
@@ -95,10 +120,22 @@ export function useUserMoviesWatched({ sortKey, userPlatforms }: UseUserMoviesWa
     let items = query.data.map(dto => mapToWatchedMovieItemVM(dto, userPlatforms));
 
     // Apply client-side sorting if needed
-    if (sortKey === 'watched_at_desc') {
-      items = sortByWatchedAtDesc(items);
+    switch (sortKey) {
+      case 'added_desc':
+        items = sortByWatchedAtDesc(items);
+        break;
+      case 'imdb_desc':
+        items = sortByRatingDesc(items);
+        break;
+      case 'year_desc':
+        items = sortByYearDesc(items);
+        break;
+      case 'year_asc':
+        items = sortByYearAsc(items);
+        break;
+      default:
+        break;
     }
-    // For 'rating_desc', backend already sorted, no client-side sorting needed
 
     return {
       items,
