@@ -7,13 +7,13 @@ Architektura interfejsu użytkownika MyVOD skupia się na trzech filarach: (1) s
 Wysoki poziom podziału UI:
 - Public: logowanie i rejestracja (`/auth/*`).
 - Onboarding (3 kroki) dostępny tylko przy pierwszym logowaniu (`/onboarding/*`).
-- Aplikacja właściwa: dashboard watchlisty (`/watchlist`). (Pozostałe widoki jak „Obejrzane”, profil i sugestie AI będą dodane później.)
+- Aplikacja właściwa: sekcje watchlisty i obejrzanych osadzone we wspólnym `MediaLibraryLayout` i `MediaToolbar`, co pozwala na późniejsze dodawanie kolejnych widoków biblioteki bez dublowania struktury. Preferencje widoku (lista/kafelki) są współdzielone pomiędzy zakładkami.
 - Admin dashboard metryk (MVP – podstawowy zakres) (`/admin`).
 - Strony błędów i fallbacki (401/403/404/offline) oraz guardy chroniące prywatne ścieżki.
 
 Zasady UX, dostępności i bezpieczeństwa:
 - Error handling first: wczesne walidacje i czytelne komunikaty (toasty/inline), guard clauses w akcjach.
-- Responsywność mobile-first: 1–2 kolumny na mobile, 3–4 na desktop (gridy w watchliście/obejrzanych).
+- Responsywność mobile-first: 1–2 kolumny na mobile, 3–4 na desktop (gridy w watchliście/obejrzanych). Wspólny layout zapewnia stałe odstępy, obramowania i zachowanie toolbaru.
 - Podstawowa dostępność: etykiety, focus-states, trap w modalach, role dla elementów interaktywnych.
 - Bezpieczeństwo: trasy chronione (auth guard), automatyczne odświeżanie JWT (interceptor), bezpieczne obchodzenie 401 (redirect po niepowodzeniu refresh), minimalizacja ujawnianych informacji o błędach logowania.
 - Wydajność: prefetch kluczowych danych, opcjonalna wirtualizacja list przy większych kolekcjach, cache kontrolowany dla sugestii (reset dzienny kalendarzowy po stronie UI).
@@ -61,22 +61,23 @@ Zgodność z API: wszystkie interakcje użytkownika mapują się na przewidziane
 - Ścieżka widoku: `/watchlist`
 - Główny cel: Centralne zarządzanie filmami do obejrzenia, z podglądem dostępności VOD i szybkim dodawaniem.
 - Kluczowe informacje do wyświetlenia: kafelki/wiersze filmów (plakat/placeholder, tytuł, rok, ocena IMDb, gatunki), ikony dostępności VOD, badge „Niedostępne…”, data „Stan z: [data]”, licznik widocznych.
-- Kluczowe komponenty widoku: App header, Search Combobox (limit 10), Toggle widoków (kafelki/lista), Sortowanie (dropdown), Filtry (checkbox „Tylko dostępne”, przycisk „Ukryj niedostępne”), Karta/Wiersz filmu z akcjami (Oznacz obejrzane, Usuń), Toastery, Paginacja/wirtualizacja (opcjonalnie), Przycisk „Zasugeruj filmy”.
+- Kluczowe komponenty widoku: App header, `MediaLibraryLayout` + `MediaToolbar` z osadzonymi elementami sterującymi (Search Combobox, Toggle widoków, wspólny SortDropdown, `FiltersBar` z przyciskiem „Ukryj niedostępne” i licznikiem), Karta/Wiersz filmu z akcjami (Oznacz obejrzane, Usuń), Toastery, Paginacja/wirtualizacja (opcjonalnie), Przycisk „Zasugeruj filmy”.
 - UX, dostępność i względy bezpieczeństwa: szybkie akcje z confirm dla usuwania, optimistic updates z opcją Undo, wyraźne stany filtrów, zapamiętywanie preferencji widoku/sortowania w sesji, focus states, minimalizacja skoków layoutu (lazy image + stałe wymiary).
 
 7) Widok: Zakładka „Obejrzane”
 - Ścieżka widoku: `/app/watched`
 - Główny cel: Przegląd historii obejrzanych filmów i opcja przywrócenia do watchlisty.
 - Kluczowe informacje do wyświetlenia: lista filmów z datą obejrzenia, te same pola co w watchliście, sort po dacie (najnowsze pierwsze).
-- Kluczowe komponenty widoku: Przełącznik widoków (kafelki/lista), Sortowanie (data domyślnie), Karta/Wiersz filmu z akcją „Przywróć do watchlisty”, Empty state.
+- Kluczowe komponenty widoku: ten sam `MediaLibraryLayout` i `MediaToolbar` co w watchliście (re-użycie Search Combobox, SortDropdown, przycisku „Zasugeruj filmy”), dedykowany `WatchedFiltersBar` (przycisk „Ukryj niedostępne / Pokaż niedostępne” + licznik), Karta/Wiersz filmu z akcją „Przywróć do watchlisty”, Empty state.
+- UX, dostępność i względy bezpieczeństwa: preferencje widoku i sortowania dziedziczone z watchlisty; filtr „Ukryj niedostępne” działa tylko przy skonfigurowanych platformach (profil) i zapamiętuje stan.
 - UX, dostępność i względy bezpieczeństwa: szybkie cofnięcie do listy, spójne skróty klawiaturowe/tabindex, brak ograniczeń na liczbę „Obejrzanych”.
 
 8) Widok: Sugestie AI (modal + deep link)
 - Ścieżka widoku: modal z `/app/watchlist` lub deep link: `/app/suggestions`
 - Główny cel: Wyświetlenie do 5 sugestii (tytuł, rok, uzasadnienie, dostępność) i dodanie wybranych do watchlisty.
 - Kluczowe informacje do wyświetlenia: lista kart sugestii, licznik/czas do resetu dziennego, komunikaty o limicie/404.
-- Kluczowe komponenty widoku: Dialog/Modal (focus trap), Lista kart sugestii (plakat, tytuł, uzasadnienie, ikony VOD), Button „Dodaj do watchlisty” (z blokadą po dodaniu), Badge z odliczaniem do resetu, Empty states, Toastery.
-- UX, dostępność i względy bezpieczeństwa: brak nadmiarowych informacji przy błędzie 429, jasny czas do kolejnej próby, nie duplikować filmów już na liście, obsługa klawiatury w modalu.
+- Kluczowe komponenty widoku: Dialog/Modal (focus trap) lub pełnoekranowa strona re-używająca `MediaLibraryLayout` – oba warianty są utrzymywane do porównania UX; Lista kart sugestii (plakat, tytuł, uzasadnienie, ikony VOD), Button „Dodaj do watchlisty” (z blokadą po dodaniu), Badge z odliczaniem do resetu, Empty states, Toastery.
+- UX, dostępność i względy bezpieczeństwa: brak nadmiarowych informacji przy błędzie 429, jasny czas do kolejnej próby, nie duplikować filmów już na liście, obsługa klawiatury zarówno w modalnym, jak i pełnoekranowym wariancie; oba rozwiązania będą prototypowane i testowane w usability.
 
 9) Widok: Profil użytkownika
 - Ścieżka widoku: `/app/profile`
@@ -161,7 +162,9 @@ Nawigacja kluczowych akcji:
 - SearchCombobox: wyszukiwarka z debounce (min. 2 znaki, max 10 wyników, plakat/placeholder, tytuł, rok, ocena).
 - MovieCard / MovieListRow: prezentacja filmu (plakat, tytuł, rok, gatunki, ocena, ikony platform), akcje kontekstowe.
 - AvailabilityBadges: ikony platform VOD w kolorze przy dostępności, badge „Niedostępne…”, znacznik „Stan z: [data]”.
+- MediaLibraryLayout & MediaToolbar: wspólny kontener i belka sterująca dla widoków biblioteki (watchlista, obejrzane oraz przyszłe ekrany). Zapewnia jednolite nagłówki, zakładki i sloty na kontrolki.
 - FiltersBar: checkbox „Tylko dostępne”, przycisk „Ukryj niedostępne”, selektor sortowania („Data dodania”, „Ocena IMDb”, „Rok”).
+- WatchedFiltersBar: toolbar obejrzanych z przyciskiem „Ukryj/Pokaż niedostępne” i licznikiem.
 - ViewToggle: przełącznik kafelki/lista (zapamiętanie preferencji w sesji).
 - SuggestionDialog / SuggestionCard: modal i karty sugestii AI (plakat, uzasadnienie, dostępność, CTA „Dodaj”).
 - ProfilePlatformsForm: checkboxy platform z ikonami, zapis zmian, odświeżenie danych listy.

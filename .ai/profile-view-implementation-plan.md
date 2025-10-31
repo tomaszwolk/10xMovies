@@ -1,7 +1,7 @@
 ## Plan implementacji widoku Profil użytkownika
 
 ## 1. Przegląd
-Widok profilu w ścieżce `/app/profile` służy do zarządzania preferencjami platform VOD użytkownika oraz ustawieniami konta (w tym RODO – trwałe usunięcie konta). Użytkownik widzi swój email, może zaznaczać/odznaczać platformy, zapisać zmiany i w sekcji „Strefa zagrożenia” usunąć konto po potwierdzeniu w oknie dialogowym. Po zapisie zmiany natychmiast wpływają na filtrowanie i sugestie AI oraz odświeżają ikony dostępności w watchliście.
+Widok profilu w ścieżce `/app/profile` służy do zarządzania preferencjami platform VOD użytkownika oraz ustawieniami konta (w tym RODO – trwałe usunięcie konta). Użytkownik widzi swój email, może zaznaczać/odznaczać platformy, zapisać zmiany i w sekcji „Strefa zagrożenia” usunąć konto po potwierdzeniu w oknie dialogowym. Po zapisie zmiany natychmiast wpływają na wspólny layout watchlisty/obejrzanych (przycisk „Ukryj niedostępne” oraz liczniki w `MediaToolbar`), na sugestie AI oraz na ikony dostępności w kartach filmów.
 
 ## 2. Routing widoku
 - Ścieżka: `/app/profile`
@@ -135,7 +135,7 @@ const QueryKeys = {
 - Po sukcesie PATCH:
   - Aktualizacja stanu początkowego = bieżące zaznaczenia; `isDirty = false`
   - `invalidateQueries(QueryKeys.userProfile, QueryKeys.userMovies, QueryKeys.aiSuggestions)`
-  - Emisja/aktualizacja flagi globalnej „hasSelectedPlatforms = platforms.length > 0” (wykorzystywana w watchliście do wyłączenia filtra „Tylko dostępne” gdy 0)
+  - Emisja/aktualizacja flagi globalnej „hasSelectedPlatforms = platforms.length > 0” (wykorzystywana w `FiltersBar`/`WatchedFiltersBar` do aktywacji/dezaktywacji przycisku „Ukryj niedostępne” i w logice sugestii AI)
 - Po sukcesie DELETE:
   - Wyczyść tokeny (localStorage), `queryClient.clear()` i przekieruj na `/` + toast „Konto zostało usunięte”.
 

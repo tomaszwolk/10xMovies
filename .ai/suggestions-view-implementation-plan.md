@@ -1,7 +1,7 @@
 ## Plan implementacji widoku Sugestie AI
 
 ## 1. Przegląd
-Widok prezentuje do 5 sugestii filmów wygenerowanych przez AI wraz z krótkim uzasadnieniem i informacją o dostępności na platformach VOD użytkownika. Umożliwia dodanie wybranych sugestii do watchlisty, obsługuje limit 1 żądania na dzień oraz deep link pod ścieżką `/app/suggestions`. Widok występuje w dwóch wariantach UI: modal (otwierany z `/app/watchlist`) oraz samodzielny widok routowany (deep link).
+Widok prezentuje do 5 sugestii filmów wygenerowanych przez AI wraz z krótkim uzasadnieniem i informacją o dostępności na platformach VOD użytkownika. Umożliwia dodanie wybranych sugestii do watchlisty, obsługuje limit 1 żądania na dzień oraz deep link pod ścieżką `/app/suggestions`. Utrzymujemy dwa równoległe warianty UI: modal przysłaniający bieżącą listę (aktualny produktowy wariant) oraz samodzielny widok korzystający ze wspólnego `MediaLibraryLayout`. Oba scenariusze będą rozwijane i testowane UX-owo, zanim zapadnie decyzja o docelowej prezentacji.
 
 Cele:
 - Szybkie wyświetlenie bieżącej paczki sugestii (o ile istnieje) lub informacja o limicie/danych wejściowych.
@@ -10,9 +10,9 @@ Cele:
 
 
 ## 2. Routing widoku
-- Modal: renderowany w kontekście strony `/app/watchlist`, sterowany stanem `open` oraz nawigacją.
-- Deep link (pełny widok): `/app/suggestions` – renderuje tę samą treść co modal, ale w layoucie strony.
-- Zalecany wzorzec nawigacyjny:
+- Modal: renderowany w kontekście strony `/app/watchlist`, sterowany stanem `open` oraz nawigacją (obecnie używany w produkcie).
+- Deep link (pełny widok): `/app/suggestions` – wariant wykorzystujący `MediaLibraryLayout` i `MediaToolbar` (spójność z watchlistą/obejrzanymi). Pozostaje w fazie testów A/B.
+- Zalecany wzorzec nawigacyjny (obsługa obu wariantów):
   - Klik przycisku „Zasugeruj filmy” na `/app/watchlist` wywołuje `navigate('/app/suggestions', { state: { asModal: true } })` i otwiera modal osadzony nad watchlistą.
   - Zamknięcie modala: `navigate(-1)` (powrót), a gdy brak historii – `navigate('/app/watchlist')`.
 - Parametr `?debug=true` (tylko środowisko testowe/dev) może omijać limit – przekazywany do zapytania.
@@ -201,7 +201,7 @@ Nowe typy (ViewModel + pomocnicze):
    - Zaimplementować `useCountdownTo(date)`.
 
 3) Komponenty UI
-   - `AISuggestionsDialog` i `AISuggestionsRoute` – kontener, nagłówek, lista, stopka, empty states.
+  - `AISuggestionsDialog` i `AISuggestionsRoute` – kontener, nagłówek, lista, stopka, empty states. Wersja routowana bazuje na `MediaLibraryLayout`, re-używając wspólne sloty na nagłówek i toolbar.
    - `SuggestionList`, `SuggestionCard`, `AvailabilityIcons`, `AddToWatchlistButton`, `RateLimitBadge`, `EmptyState`.
    - Stylowanie Tailwind + shadcn/ui (Dialog, Button, Badge, Tooltip, Toast).
 
