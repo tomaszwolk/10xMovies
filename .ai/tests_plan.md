@@ -1093,48 +1093,49 @@ afterAll(() => server.close())
 | **Watched View** | ✅ GOTOWE | 23 testy | 95%+ | ✅ Produkcyjne |
 | **Profile View** | ✅ GOTOWE | 58 testów | 95%+ | ✅ Produkcyjne |
 | **Onboarding Platforms View** | ✅ GOTOWE | 59 testów | 95%+ | ✅ Produkcyjne |
+| **Onboarding Add View** | 🟡 Częściowo (53/75) | 53 testów | ~71% | ✅ Produkcyjne |
 
-**Razem: 178 testów ✅**
+**Razem: 231 testów ✅**
 
 ### 🔄 **DO ZROBIENIA:**
 
 | Widok | Status | Testy do zrobienia | Priorytet | Szacowany czas |
 |-------|--------|-------------------|-----------|----------------|
-| **Onboarding Add View** | 🟡 Częściowo (12/52) | ~40 testów | 🟡 ŚREDNI | 16-20h |
+| **Onboarding Add View** | 🟡 Częściowo (53/75) | ~22 testów | 🟡 ŚREDNI | 6-10h |
 | **Onboarding Watched View** | 🔴 Brak testów | ~50 testów | 🔴 WYSOKI | 13-17h |
 | **Auth Views** | 🔴 Brak testów | ~96 testów | 🔴 WYSOKI | 16-20h |
 
-**Razem do zrobienia: ~186+ testów**
+**Razem do zrobienia: ~168+ testów**
 
 ---
 
 ### 📈 **PODSUMOWANIE POSTĘPU:**
 
-- **Zaimplementowane:** 178 testów
-- **Pozostałe:** ~186+ testów
-- **Razem:** ~364+ testów w całym projekcie
-- **Obecny postęp:** **~49%**
+- **Zaimplementowane:** 231 testów
+- **Pozostałe:** ~168+ testów
+- **Razem:** ~399+ testów w całym projekcie
+- **Obecny postęp:** **~58%**
 
 ---
 
 ### 🎯 **REKOMENDOWANA KOLEJNOŚĆ:**
 
-1. **🔴 Onboarding Watched View** - kontynuacja onboarding flow (13-17h)
-2. **🔴 Auth Views** - krytyczne dla bezpieczeństwa (16-20h)
-3. **🟡 Onboarding Add View** - częściowo gotowe (16-20h)
+1. **🟡 Onboarding Add View** - dokończenie pozostałych 32 testów (8-12h)
+2. **🔴 Onboarding Watched View** - kontynuacja onboarding flow (13-17h)
+3. **🔴 Auth Views** - krytyczne dla bezpieczeństwa (16-20h)
 
 ---
 
 ## Etap: Onboarding Add View (Krok 2/3)
 
 ### Status implementacji: ✅ GOTOWE DO PRODUKCJI
-### Status testów: 🟡 CZĘŚCIOWO ZAIMPLEMENTOWANE (12/52 testów)
+### Status testów: 🟡 CZĘŚCIOWO ZAIMPLEMENTOWANE (53/75 testów)
 
 ---
 
 ## ✅ ZAIMPLEMENTOWANE TESTY ONBOARDING ADD VIEW
 
-### 1. ✅ Hook: `useMovieSearch` (`src/hooks/__tests__/useMovieSearch.test.ts`)
+### 1. ✅ Hook: `useMovieSearch` (`src/hooks/__tests__/useMovieSearch.test.tsx`)
 
 **Typ:** Testy integracyjne z React Query
 **Framework:** Vitest + React Testing Library
@@ -1180,67 +1181,142 @@ afterAll(() => server.close())
 ✅ should handle invalid inputs
 ```
 
-**Razem: 12/52 testów zaimplementowanych ✅**
+---
+
+### 4. ✅ Hook: `useDebouncedValue` (`src/hooks/__tests__/useDebouncedValue.test.ts`)
+
+**Typ:** Testy jednostkowe
+**Framework:** Vitest
+**Coverage:** 10 testów
+
+**Testy wykonane:**
+```typescript
+✅ should return initial value immediately
+✅ should debounce value changes
+✅ should use default delay of 250ms
+✅ should use custom delay
+✅ should cleanup timeout on unmount
+✅ should handle rapid value changes
+✅ should reset debounce when value changes again
+✅ should handle delay changes
+✅ should work with different data types
+✅ should handle delay of 0 (minimal debounce)
+```
+
+---
+
+### 5. ✅ Hook: `useAddUserMovie` (`src/hooks/__tests__/useAddUserMovie.test.tsx`)
+
+**Typ:** Testy integracyjne z React Query
+**Framework:** Vitest + React Testing Library
+**Coverage:** 10 testów
+
+**Testy wykonane:**
+```typescript
+✅ should map UserMovieDto to AddedMovieVM correctly
+✅ should call addUserMovie API with correct parameters
+✅ should invalidate user-movies queries on success
+✅ should handle 409 Conflict error
+✅ should handle 400 Bad Request error
+✅ should handle 5xx Server Error
+✅ should handle network errors
+✅ should support mark_as_watched parameter
+✅ should return mutation state correctly
+✅ should handle successful mutation with different movie data
+```
+
+---
+
+### 6. ✅ Component: `SearchResultItem` (`src/components/onboarding/__tests__/SearchResultItem.test.tsx`)
+
+**Typ:** Testy komponentu
+**Framework:** Vitest + React Testing Library
+**Coverage:** 11 testów
+
+**Testy wykonane:**
+```typescript
+✅ should render movie title and year
+✅ should render poster image when posterUrl exists
+✅ should render placeholder when posterUrl is null
+✅ should call onAdd when item is clicked
+✅ should call onAdd when button is clicked
+✅ should be disabled when disabled prop is true
+✅ should handle keyboard navigation (Enter, Space)
+✅ should not call onAdd when disabled and clicked
+✅ should not call onAdd when disabled and keyboard activated
+✅ should render rating when available
+✅ should have correct accessibility attributes
+```
+
+---
+
+### 7. ✅ Component: `AddedMoviesGrid` (`src/components/onboarding/__tests__/AddedMoviesGrid.test.tsx`)
+
+**Typ:** Testy komponentu
+**Framework:** Vitest + React Testing Library
+**Coverage:** 12 testów
+
+**Testy wykonane:**
+```typescript
+✅ should render empty state when no items
+✅ should render movie cards for each item
+✅ should show counter badge with correct count
+✅ should show placeholder slots for empty positions
+✅ should render max 3 items
+✅ should call onRemove when remove button clicked
+✅ should render multiple movies correctly
+✅ should handle movie without poster
+✅ should handle movie without year
+✅ should show loading state when removing
+✅ should have correct grid layout classes
+✅ should render header with correct text
+```
+
+**Razem: 43/75 testów zaimplementowanych ✅**
+
+---
+
+### 8. ✅ Component: `MovieSearchCombobox` (`src/components/onboarding/__tests__/MovieSearchCombobox.test.tsx`)
+
+**Typ:** Testy komponentu
+**Framework:** Vitest + React Testing Library
+**Coverage:** 5 testów (Batch 1 - podstawowa funkcjonalność)
+
+**Testy wykonane:**
+```typescript
+✅ should render search input with correct placeholder
+✅ should call onChange when typing
+✅ should debounce search (450ms)
+✅ should handle keyboard navigation keys
+✅ should handle disabled movies prop
+✅ should accept onSelectOption callback
+✅ should have correct ARIA attributes
+```
+
+---
+
+### 9. ✅ Page: `OnboardingAddPage` - Integration Tests (`src/pages/onboarding/__tests__/OnboardingAddPage.integration.test.tsx`)
+
+**Typ:** Testy integracyjne strony
+**Framework:** Vitest + React Testing Library + MSW
+**Coverage:** 5 testów (Batch 2 - pełne scenariusze użytkownika)
+
+**Testy wykonane:**
+```typescript
+✅ should render onboarding page correctly
+✅ should handle skip navigation
+✅ should show validation error when trying to continue without 3 movies
+✅ should handle prefilled movies from existing watchlist
+✅ should show progress bar with correct values
+```
+
+**Razem: 53/75 testów zaimplementowanych ✅**
 
 ---
 
 ## Testy DO zaimplementowania
 
-### ❌ 1. Hook: `useAddUserMovie` (BRAK)
-
-**Typ:** Testy jednostkowe
-**Priority:** 🔴 HIGH
-**File:** `src/hooks/__tests__/useAddUserMovie.test.ts`
-
-**Co testować:**
-```typescript
-❌ should map UserMovieDto to AddedMovieVM correctly
-   - Testuje mapowanie response z backend
-   
-❌ should call addUserMovie API with correct parameters
-   - Testuje że mutation wywołuje API z { tconst }
-   
-❌ should invalidate user-movies queries on success
-   - Testuje że cache React Query jest invalidowany
-   
-❌ should handle 409 Conflict error
-   - Mock API zwraca 409, sprawdź czy error jest propagowany
-   
-❌ should handle 400 Bad Request error
-   - Mock API zwraca 400
-   
-❌ should handle 5xx Server Error
-   - Mock API zwraca 500+
-```
-
----
-
-### ❌ 2. Hook: `useDebouncedValue` (BRAK)
-
-**Typ:** Testy jednostkowe
-**Priority:** 🟡 MEDIUM
-**File:** `src/hooks/__tests__/useDebouncedValue.test.ts`
-
-**Co testować:**
-```typescript
-❌ should debounce value changes
-   - Zmień wartość 3x szybko, sprawdź że tylko ostatnia wartość jest zwrócona
-   
-❌ should use default delay of 250ms
-   - Nie podaj delay, sprawdź że używa 250ms
-   
-❌ should use custom delay
-   - Podaj delay 500ms, sprawdź że działa
-   
-❌ should cleanup timeout on unmount
-   - Unmount komponent, sprawdź że timeout jest wyczyszczony
-```
-
-**Uwaga:** Będzie potrzebne użycie `vi.useFakeTimers()` w Vitest!
-
----
-
-### ❌ 3. Component: `MovieSearchCombobox` (BRAK)
+### ❌ 1. Component: `MovieSearchCombobox` (~20 testów)
 
 **Typ:** Testy integracyjne komponentu
 **Priority:** 🔴 HIGH
@@ -1250,93 +1326,74 @@ afterAll(() => server.close())
 ```typescript
 ❌ should show results when query length >= 2
    - Wpisz 2 znaki, sprawdź że dropdown się otwiera
-   
+
 ❌ should not show results when query length < 2
    - Wpisz 1 znak, sprawdź że dropdown jest zamknięty
-   
+
 ❌ should call onSelectOption when item is clicked
    - Kliknij w wynik, sprawdź że callback jest wywołany
-   
+
 ❌ should navigate with arrow keys
    - Symuluj ArrowDown/ArrowUp, sprawdź activeIndex
-   
+
 ❌ should select item with Enter key
    - Zaznacz item strzałkami, wciśnij Enter, sprawdź callback
-   
+
 ❌ should close on Escape key
    - Otwórz dropdown, wciśnij Escape, sprawdź że jest zamknięty
-   
+
 ❌ should disable items in disabledTconsts Set
    - Przekaż Set z tconst, sprawdź że item ma disabled
-   
+
 ❌ should show loader when isLoading
    - Mock useMovieSearch z isLoading=true, sprawdź loader
-   
+
 ❌ should show error message when error occurs
    - Mock useMovieSearch z error, sprawdź komunikat błędu
+
+❌ should show empty state when no results
+   - Mock useMovieSearch → [], sprawdź "Nie znaleziono filmów"
+
+❌ should call onPick when result is clicked
+   - Kliknij wynik, sprawdź że onPick został wywołany z SearchOptionVM
+
+❌ should clear input after picking
+   - Wybierz film, sprawdź że value = ""
+
+❌ should have correct ARIA attributes
+   - role="combobox", aria-expanded, aria-activedescendant
+
+❌ should render search input with correct placeholder
+   - Sprawdź placeholder "Szukaj filmów..."
+
+❌ should show disabled placeholder when disabled
+   - Przekaż disabled=true, sprawdź placeholder "Osiągnięto limit 3 filmów"
+
+❌ should call onChange when typing
+   - Wpisz tekst, sprawdź że onChange został wywołany
+
+❌ should debounce search (250ms)
+   - Mock useDebouncedValue, sprawdź debouncing
+
+❌ should handle keyboard navigation with disabled items
+   - Sprawdź że disabled items są pomijane w nawigacji klawiszami
+
+❌ should handle focus management
+   - Sprawdź focus na input i dropdown
+
+❌ should handle outside click to close
+   - Kliknij poza komponentem, sprawdź że dropdown się zamyka
+
+❌ should handle loading states during search
+   - Sprawdź różne stany ładowania
+
+❌ should handle search results with different data
+   - Testuj z różnymi typami filmów i danymi
 ```
 
 ---
 
-### ❌ 4. Component: `AddedMoviesGrid` (BRAK)
-
-**Typ:** Testy komponentu
-**Priority:** 🟡 MEDIUM
-**File:** `src/components/onboarding/__tests__/AddedMoviesGrid.test.tsx`
-
-**Co testować:**
-```typescript
-❌ should render empty state when no items
-   - Przekaż [], sprawdź "Brak dodanych filmów"
-   
-❌ should render movie cards for each item
-   - Przekaż 2 filmy, sprawdź że są 2 AddedMovieCard
-   
-❌ should show counter badge with correct count
-   - Przekaż 2 filmy, sprawdź "2/3"
-   
-❌ should show placeholder slots for empty positions
-   - Przekaż 1 film, sprawdź że są 2 placeholder slots (dashed border)
-   
-❌ should render max 3 items
-   - Przekaż 5 filmów (nie powinno się zdarzyć), sprawdź że tylko 3 są renderowane
-```
-
----
-
-### ❌ 5. Component: `SearchResultItem` (BRAK)
-
-**Typ:** Testy komponentu
-**Priority:** 🟢 LOW
-**File:** `src/components/onboarding/__tests__/SearchResultItem.test.tsx`
-
-**Co testować:**
-```typescript
-❌ should render movie title and year
-   - Sprawdź czy wyświetla primaryTitle i startYear
-   
-❌ should render poster image when posterUrl exists
-   - Przekaż posterUrl, sprawdź <img>
-   
-❌ should render placeholder when posterUrl is null
-   - Przekaż posterUrl=null, sprawdź "No image"
-   
-❌ should call onAdd when item is clicked
-   - Kliknij, sprawdź callback
-   
-❌ should call onAdd when button is clicked
-   - Kliknij przycisk "Dodaj", sprawdź callback
-   
-❌ should be disabled when disabled prop is true
-   - Przekaż disabled=true, sprawdź aria-disabled i opacity
-   
-❌ should handle keyboard navigation (Enter, Space)
-   - Symuluj Enter/Space, sprawdź że wywołuje onAdd
-```
-
----
-
-### ❌ 6. Integration: Full Onboarding Add Flow (BRAK)
+### ❌ 2. Integration: Full Onboarding Add Flow (~12 testów)
 
 **Typ:** Testy integracyjne E2E-like
 **Priority:** 🔴 HIGH
@@ -1351,35 +1408,64 @@ afterAll(() => server.close())
    4. Kliknij film
    5. Sprawdź toast success
    6. Sprawdź że film jest w "Added" grid
-   
+
 ❌ should handle duplicate (409) error gracefully
    1. Mock addUserMovie → 409 Conflict
    2. Dodaj film
    3. Sprawdź toast info "już na liście"
    4. Sprawdź że film został usunięty z UI (rollback)
-   
+
 ❌ should prevent adding more than 3 movies
    1. Dodaj 3 filmy
    2. Sprawdź że wszystkie przyciski "Dodaj" są disabled
    3. Sprawdź badge "3/3"
-   
+
 ❌ should prevent adding duplicate in session
    1. Dodaj film A
    2. Spróbuj dodać film A ponownie
    3. Sprawdź że przycisk jest disabled dla film A
-   
+
 ❌ should navigate to next step on Next button
    1. Mock navigate
    2. Kliknij "Dalej"
-   3. Sprawdź navigate('/watchlist') wywołane
-   
-❌ should navigate to next step on Skip button
-   1. Mock navigate
-   2. Kliknij "Skip"
-   3. Sprawdź navigate('/watchlist') wywołane
-```
+   3. Sprawdź navigate('/onboarding/watched') wywołane
 
-**Uwaga:** To będą najważniejsze testy! Sprawdzają cały flow użytkownika.
+❌ should handle network errors during search
+   1. Mock searchMovies → network error
+   2. Sprawdź error message w UI
+
+❌ should handle API errors during add
+   1. Mock addUserMovie → 500 error
+   2. Dodaj film
+   3. Sprawdź toast error
+   4. Sprawdź że film został usunięty z UI
+
+❌ should persist selection in session
+   1. Dodaj filmy
+   2. Odśwież stronę (symuluj)
+   3. Sprawdź że filmy są nadal widoczne
+
+❌ should handle undo operations
+   1. Dodaj film
+   2. Kliknij X żeby usunąć
+   3. Sprawdź że film zniknął z listy
+
+❌ should validate search input
+   1. Wpisz mniej niż 2 znaki
+   2. Sprawdź że nie ma wyników
+
+❌ should handle rapid clicking
+   1. Klikaj szybko wiele filmów
+   2. Sprawdź że tylko jeden request jest wysyłany na raz
+
+❌ should show loading states during operations
+   1. Sprawdź loading indicators podczas dodawania filmów
+
+❌ should handle component unmount during operations
+   1. Rozpocznij dodawanie filmu
+   2. Odmontuj komponent
+   3. Sprawdź brak memory leaks
+```
 
 ---
 
@@ -3104,8 +3190,8 @@ it('should handle 409 conflict', async () => {
 ---
 
 **Data utworzenia:** 29 października 2025
-**Ostatnia aktualizacja:** 1 listopada 2025
-**Status:** Watchlist + Watched + Profile + Onboarding Platforms - testy zaimplementowane | Onboarding Add częściowo, Watched i Auth brak testów
-**Etapy:** Watchlist + Watched + Profile + Onboarding Platforms zakończone | Onboarding Add (częściowo) + Onboarding Watched + Auth do przetestowania
-**Postęp:** ~49% (178/364+ testów)
+**Ostatnia aktualizacja:** 2 listopada 2025
+**Status:** Watchlist + Watched + Profile + Onboarding Platforms - testy zaimplementowane | Onboarding Add częściowo (53/75 testów), Onboarding Watched i Auth brak testów
+**Etapy:** Watchlist + Watched + Profile + Onboarding Platforms zakończone | Onboarding Add (71% gotowe) + Onboarding Watched + Auth do przetestowania
+**Postęp:** ~58% (231/399+ testów)
 
