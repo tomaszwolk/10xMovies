@@ -17,6 +17,8 @@ import { usePatchUserMovie } from "@/hooks/usePatchUserMovie";
 import { WatchedToolbar } from "@/components/watched/WatchedToolbar";
 import { WatchedContent } from "@/components/watched/WatchedContent";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 import { MediaLibraryLayout } from "@/components/library/MediaLibraryLayout";
 import { useAISuggestionsHandler } from "@/hooks/useAISuggestionsHandler";
 import { SuggestionModal } from "@/components/watchlist/SuggestionModal";
@@ -170,12 +172,10 @@ export function WatchedPage() {
   const headerActions = (
     <div className="flex items-center gap-3">
       <ThemeToggle key="theme-toggle" />
-      <button
-        onClick={logout}
-        className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg transition-colors"
-      >
+      <Button variant="outline" onClick={logout} className="gap-2">
+        <LogOut className="h-4 w-4" />
         Wyloguj się
-      </button>
+      </Button>
     </div>
   );
 
@@ -217,6 +217,12 @@ export function WatchedPage() {
       label: "Obejrzane",
       isActive: true,
       onSelect: () => {},
+    },
+    {
+      id: "profile",
+      label: "Profil",
+      isActive: false,
+      onSelect: () => navigate("/app/profile"),
     },
   ];
 

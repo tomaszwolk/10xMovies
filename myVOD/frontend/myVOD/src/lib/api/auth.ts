@@ -58,3 +58,12 @@ export async function getUserProfile(): Promise<UserProfileDto> {
   return data;
 }
 
+/**
+ * Delete the current user's account (RODO-compliant permanent deletion).
+ * @returns Promise that resolves when account is deleted
+ * @throws API error with status and data
+ */
+export async function deleteAccount(): Promise<void> {
+  await http.delete("/me/");
+}
+
