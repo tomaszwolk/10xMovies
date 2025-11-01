@@ -56,6 +56,7 @@ urlpatterns = [
 
     # User Profile (Authenticated)
     path("api/me/", views.UserProfileView.as_view(), name="user-profile"),
+    path("api/me/change-password/", views.ChangePasswordView.as_view(), name="change-password"),
 
     # User Registration (Public)
     path("api/register/", views.RegisterView.as_view(), name="register"),

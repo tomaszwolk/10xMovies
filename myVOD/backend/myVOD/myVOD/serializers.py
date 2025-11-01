@@ -158,6 +158,52 @@ class UpdateUserProfileSerializer(serializers.Serializer):
         return value
 
 
+class ChangePasswordSerializer(serializers.Serializer):
+    """
+    Serializer for password change request.
+    Validates current password and new password requirements.
+
+    Request body for POST /api/me/change-password/
+    """
+    current_password = serializers.CharField(
+        required=True,
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text="Current password for verification"
+    )
+    new_password = serializers.CharField(
+        required=True,
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text="New password (minimum 8 characters, must contain letters and numbers)"
+    )
+
+    def validate_current_password(self, value):
+        """Verify that current password is correct."""
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate_new_password(self, value):
+        """Validate new password meets security requirements."""
+        user = self.context['request'].user
+        # Use Django's password validators
+        try:
+            validate_password(value, user=user)
+        except DjangoValidationError as e:
+            # Convert Django ValidationError to DRF ValidationError
+            raise serializers.ValidationError(list(e.messages))
+        
+        # Check if new password is different from current
+        if user.check_password(value):
+            raise serializers.ValidationError(
+                "New password must be different from current password."
+            )
+        
+        return value
+
+
 class RegisterUserSerializer(serializers.Serializer):
     """
     Serializer for user registration request.

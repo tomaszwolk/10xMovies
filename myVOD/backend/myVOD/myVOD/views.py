@@ -18,13 +18,15 @@ from .serializers import (
     PlatformSerializer,
     UserProfileSerializer,
     UpdateUserProfileSerializer,
+    ChangePasswordSerializer,
     RegisterUserSerializer,
     RegisteredUserSerializer,
     AISuggestionsSerializer
 )
 from services.user_profile_service import (
     get_user_profile,
-    update_user_platforms
+    update_user_platforms,
+    change_user_password,
 )
 from services.user_registration_service import register_user
 from services.ai_suggestions_service import (
@@ -281,6 +283,118 @@ class UserProfileView(APIView):
         except Exception as e:
             logger.error(
                 f"Unexpected error while updating user profile: {str(e)}",
+                exc_info=True
+            )
+            return Response(
+                {"error": "An unexpected error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ChangePasswordView(APIView):
+    """
+    API view for changing user password.
+
+    POST /api/me/change-password/
+
+    Requires authentication (JWT token).
+    Allows authenticated user to change their password by providing
+    current password for verification and new password meeting security requirements.
+
+    Returns:
+        200: Success message
+        400: Invalid current password, weak new password, or new password same as current
+        401: Missing or invalid authentication
+        500: Internal server error
+
+    Business Logic:
+        - Validates current password is correct
+        - Validates new password meets security requirements (min 8 chars, letters and numbers)
+        - Ensures new password is different from current password
+        - Hashes new password using Django's authentication system
+        - Updates user's password in database
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Change user password",
+        description=(
+            "Changes the password for the currently authenticated user. "
+            "Requires current password for verification and new password "
+            "meeting security requirements (min 8 chars, letters and numbers). "
+            "New password must be different from current password. "
+            "Requires JWT authentication."
+        ),
+        request=ChangePasswordSerializer,
+        responses={
+            200: OpenApiTypes.OBJECT,
+            400: OpenApiTypes.OBJECT,
+            401: OpenApiTypes.OBJECT,
+            500: OpenApiTypes.OBJECT,
+        },
+        tags=['User Profile'],
+    )
+    def post(self, request):
+        """
+        Handle POST request for changing user password.
+
+        Implements guard clauses for early error returns:
+        1. User is already authenticated (permission class)
+        2. Validate request data (current password, new password)
+        3. Verify current password
+        4. Update password via service layer
+        5. Return success response
+        """
+        # Validate request data
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        
+        if not serializer.is_valid():
+            logger.warning(
+                f"Invalid password change request for user {request.user.email}: "
+                f"{serializer.errors}"
+            )
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Update password via service layer
+            new_password = serializer.validated_data['new_password']
+            change_user_password(request.user, new_password)
+            
+            logger.info(
+                f"Successfully changed password for user {request.user.email}"
+            )
+            
+            return Response(
+                {"message": "Password changed successfully"},
+                status=status.HTTP_200_OK
+            )
+        
+        except ValueError as e:
+            logger.warning(
+                f"Value error while changing password for user {request.user.email}: {str(e)}"
+            )
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except DatabaseError as e:
+            logger.error(
+                f"Database error while changing password for user {request.user.email}: {str(e)}",
+                exc_info=True
+            )
+            return Response(
+                {"error": "An error occurred while changing password. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected error while changing password for user {request.user.email}: {str(e)}",
                 exc_info=True
             )
             return Response(
