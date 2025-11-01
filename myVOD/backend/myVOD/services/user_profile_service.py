@@ -159,3 +159,37 @@ def update_user_platforms(user, platform_ids: list[int]):
             exc_info=True
         )
         raise
+
+
+def change_user_password(user, new_password: str) -> None:
+    """
+    Change user's password.
+
+    This function implements business logic for POST /api/me/change-password/
+
+    Args:
+        user: Django User instance
+        new_password: New password (already validated)
+
+    Raises:
+        ValueError: If password is empty
+        Exception: If password update fails
+    """
+    if not new_password:
+        raise ValueError("New password is required")
+    
+    try:
+        # Set password (Django automatically hashes it)
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+        
+        logger.info(
+            f"Successfully changed password for user {user.email}"
+        )
+    
+    except Exception as e:
+        logger.error(
+            f"Error changing password for user {user.email}: {str(e)}",
+            exc_info=True
+        )
+        raise

@@ -265,18 +265,20 @@ export function WatchlistPage() {
           />
         }
       >
-        <WatchlistContent
-          items={items}
-          viewMode={viewMode}
-          isLoading={isLoading}
-          platforms={platformsQuery.data || []}
-          onMarkWatched={handleMarkWatched}
-          onDelete={handleDelete}
-          onAddToWatchlist={handleAddToWatchlist}
-          onAddToWatched={handleAddToWatched}
-          existingTconsts={existingTconsts}
-          existingWatchedTconsts={existingWatchedTconsts}
-        />
+        <div className="p-4">
+          <WatchlistContent
+            items={items}
+            viewMode={viewMode}
+            isLoading={isLoading}
+            platforms={platformsQuery.data || []}
+            onMarkWatched={handleMarkWatched}
+            onDelete={handleDelete}
+            onAddToWatchlist={handleAddToWatchlist}
+            onAddToWatched={handleAddToWatched}
+            existingTconsts={existingTconsts}
+            existingWatchedTconsts={existingWatchedTconsts}
+          />
+        </div>
       </MediaLibraryLayout>
 
       <ConfirmDialog

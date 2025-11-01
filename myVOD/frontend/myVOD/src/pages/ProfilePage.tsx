@@ -6,6 +6,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { usePlatforms } from "@/hooks/usePlatforms";
 import { useUpdateUserPlatforms } from "@/hooks/useUpdateUserPlatforms";
 import { useDeleteAccount } from "@/hooks/useDeleteAccount";
+import { useChangePassword } from "@/hooks/useChangePassword";
 import { useAddMovie } from "@/hooks/useAddMovie";
 import { useListUserMovies } from "@/hooks/useListUserMovies";
 import { usePatchUserMovie } from "@/hooks/usePatchUserMovie";
@@ -16,6 +17,7 @@ import { SearchCombobox } from "@/components/watchlist/SearchCombobox";
 import { SuggestAIButton } from "@/components/watchlist/SuggestAIButton";
 import { SuggestionModal } from "@/components/watchlist/SuggestionModal";
 import { PlatformPreferencesCard } from "@/components/profile/PlatformPreferencesCard";
+import { ChangePasswordCard } from "@/components/profile/ChangePasswordCard";
 import { DangerZoneCard } from "@/components/profile/DangerZoneCard";
 import { DeleteAccountSection } from "@/components/profile/DeleteAccountSection";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -47,6 +49,7 @@ export function ProfilePage() {
   // Mutations
   const updatePlatformsMutation = useUpdateUserPlatforms();
   const deleteAccountMutation = useDeleteAccount();
+  const changePasswordMutation = useChangePassword();
   const addMovieMutation = useAddMovie();
   const patchUserMovieMutation = usePatchUserMovie();
   const suggestionsHandler = useAISuggestionsHandler();
@@ -113,6 +116,13 @@ export function ProfilePage() {
     deleteAccountMutation.mutate();
   };
 
+  const handleChangePassword = async (currentPassword: string, newPassword: string) => {
+    await changePasswordMutation.mutateAsync({
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+  };
+
   const handleLogout = () => {
     logout();
     navigate("/auth/login", { replace: true });
@@ -125,9 +135,6 @@ export function ProfilePage() {
   const handleAddFromSuggestion = (tconst: string) => {
     suggestionsHandler.addFromSuggestion(tconst);
   };
-
-  // Check if user has selected platforms for AI suggestions
-  const hasUserPlatforms = (userProfileQuery.data?.platforms?.length || 0) > 0;
 
   // Handlers for adding movies (from search)
   const handleAddToWatchlist = async (tconst: string) => {
@@ -269,7 +276,7 @@ export function ProfilePage() {
           />
         }
       >
-        <div className="p-6">
+        <div className="p-4">
           {isLoading ? (
             <div className="space-y-4">
               <div className="h-8 bg-muted animate-pulse rounded w-1/3" />
@@ -286,7 +293,7 @@ export function ProfilePage() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Platform Preferences Section */}
               <PlatformPreferencesCard
                 platforms={platformsQuery.data || []}
@@ -296,6 +303,15 @@ export function ProfilePage() {
                 saving={updatePlatformsMutation.isPending}
                 onSave={handleSave}
                 onReset={handleReset}
+              />
+
+              {/* Separator */}
+              <div className="border-t border-border" />
+
+              {/* Change Password Section */}
+              <ChangePasswordCard
+                onChangePassword={handleChangePassword}
+                isChanging={changePasswordMutation.isPending}
               />
 
               {/* Separator */}

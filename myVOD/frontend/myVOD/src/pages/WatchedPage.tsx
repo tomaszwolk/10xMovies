@@ -253,15 +253,17 @@ export function WatchedPage() {
           />
         }
       >
-        <WatchedContent
-        items={filteredItems}
-          viewMode={viewMode}
-          platforms={platformsQuery.data || []}
-          isLoading={isLoading}
-        isEmpty={isFilteredEmpty}
-          onRestore={handleRestore}
-          isRestoring={restoreMutation.isPending}
-        />
+        <div className="p-4">
+          <WatchedContent
+            items={filteredItems}
+            viewMode={viewMode}
+            platforms={platformsQuery.data || []}
+            isLoading={isLoading}
+            isEmpty={isFilteredEmpty}
+            onRestore={handleRestore}
+            isRestoring={restoreMutation.isPending}
+          />
+        </div>
       </MediaLibraryLayout>
 
       <SuggestionModal

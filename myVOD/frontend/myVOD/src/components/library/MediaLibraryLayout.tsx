@@ -71,7 +71,7 @@ export function MediaLibraryLayout({
 
         {toolbar ? <div className="mb-6">{toolbar}</div> : null}
 
-        <section className="bg-card rounded-lg shadow-lg overflow-hidden border">
+        <section className="bg-card rounded-lg shadow-lg overflow-hidden">
           {children}
         </section>
       </div>

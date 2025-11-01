@@ -67,3 +67,31 @@ export async function deleteAccount(): Promise<void> {
   await http.delete("/me/");
 }
 
+/**
+ * Change password request payload.
+ */
+export type ChangePasswordCommand = {
+  current_password: string;
+  new_password: string;
+};
+
+/**
+ * Change password response.
+ */
+export type ChangePasswordResponse = {
+  message: string;
+};
+
+/**
+ * Change the current user's password.
+ * Requires current password for verification and new password meeting security requirements.
+ * @param payload - Password change data (current_password, new_password)
+ * @returns Success message
+ * @throws API error with status and data
+ */
+export async function changePassword(
+  payload: ChangePasswordCommand
+): Promise<ChangePasswordResponse> {
+  const { data } = await http.post<ChangePasswordResponse>("/me/change-password/", payload);
+  return data;
+}
